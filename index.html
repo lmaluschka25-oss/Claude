@@ -1,0 +1,1290 @@
+<!doctype html>
+<html lang="de">
+<head>
+<!-- Der Weg — Tagesbegleiter für Lukas. Ratgeber · Leitfaden · Tracker. Eine Datei, keine Abhängigkeiten, Daten bleiben im Browser. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0c0b">
+<title>Der Weg — Tagesbegleiter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='38' fill='%23ff8a1e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500;1,9..144,900&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink:#0d0c0b; --ink-2:#15130f; --paper:#f4ede0; --paper-dim:#b9ad99; --paper-faint:#7d7363;
+    --amber:#ff8a1e; --amber-deep:#e8650a; --gold:#ffc24d; --line:#2a2722; --maxw:840px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{ background:var(--ink); color:var(--paper); font-family:"Hanken Grotesk",system-ui,sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+  body::before{ content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(120% 60% at 80% -10%, rgba(255,138,30,.16), transparent 60%),radial-gradient(90% 50% at -10% 8%, rgba(232,101,10,.10), transparent 55%); }
+  body::after{ content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"); }
+  .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:56px 28px 90px}
+
+  /* HERO */
+  .eyebrow{font-size:13px;letter-spacing:.42em;text-transform:uppercase;color:var(--amber);font-weight:700;margin:0 0 18px}
+  h1{font-family:"Fraunces",serif;font-weight:900;font-optical-sizing:auto;font-size:clamp(40px,8.5vw,72px);line-height:.92;letter-spacing:-.02em;margin:0;color:var(--paper)}
+  h1 .glow{color:var(--amber)}
+  .lede{color:var(--paper-dim);max-width:46ch;margin:22px 0 0;font-size:16.5px}
+
+  /* TABS */
+  .tabnav{display:flex;gap:2px;margin:34px 0 0;border-bottom:1px solid var(--line);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabnav::-webkit-scrollbar{display:none}
+  .tabnav button{appearance:none;-webkit-appearance:none;background:none;border:none;cursor:pointer;font-family:"Hanken Grotesk",sans-serif;font-weight:700;font-size:14px;letter-spacing:.03em;color:var(--paper-faint);padding:12px 14px;position:relative;transition:color .15s;white-space:nowrap;flex:none}
+  .tabnav button:hover{color:var(--paper-dim)}
+  .tabnav button.active{color:var(--amber)}
+  .tabnav button.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--amber)}
+  .panel{display:none}
+  .panel.active{display:block}
+
+  /* BANNER / QUOTE OF THE DAY */
+  .banner{margin:36px 0 18px;padding:34px 30px 24px;border:1px solid var(--line);border-radius:4px;background:linear-gradient(180deg,rgba(255,138,30,.05),transparent);position:relative}
+  .banner::before{content:"„";position:absolute;top:-14px;left:18px;font-family:"Fraunces",serif;font-size:80px;color:var(--amber-deep);line-height:1}
+  .banner p.qtext{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:clamp(20px,3.4vw,27px);line-height:1.3;margin:0;color:var(--paper)}
+  .banner em{color:var(--gold);font-style:italic;font-weight:900}
+  .q-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px}
+  .q-author{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--paper-faint);font-weight:700}
+  .q-actions{display:flex;gap:8px}
+  .qbtn{appearance:none;background:none;border:1px solid var(--line);border-radius:7px;color:var(--paper-faint);font-family:inherit;font-size:12.5px;font-weight:700;letter-spacing:.04em;padding:7px 12px;cursor:pointer;transition:.15s}
+  .qbtn:hover{border-color:rgba(255,138,30,.55);color:var(--paper-dim)}
+  .qbtn.on{color:var(--gold);border-color:rgba(255,194,77,.55)}
+  .qline{margin:14px 0 0}
+  .qline input{width:100%;background:var(--ink-2);border:1px solid var(--line);border-radius:8px;color:var(--paper);font-family:"Fraunces",serif;font-style:italic;font-size:16px;padding:13px 14px}
+  .qline input::placeholder{color:var(--paper-faint)}
+  .qline input:focus{outline:none;border-color:rgba(255,138,30,.6)}
+
+  /* SECTION HEADINGS */
+  .sec-label{margin:64px 0 4px;font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--amber);font-weight:700}
+  .sec-rule{height:2px;background:linear-gradient(90deg,var(--amber-deep),transparent);border:0;margin:0 0 8px}
+
+  /* DAY BLOCKS (Leitfaden) */
+  .block{display:grid;grid-template-columns:78px 1fr;gap:22px;padding:30px 0;border-bottom:1px solid var(--line);align-items:start}
+  .num{font-family:"Fraunces",serif;font-weight:900;font-size:54px;line-height:1;color:transparent;-webkit-text-stroke:1.5px var(--amber-deep);letter-spacing:-.04em}
+  .block h2{font-family:"Fraunces",serif;font-weight:900;font-size:23px;letter-spacing:-.01em;margin:6px 0 16px;color:var(--paper)}
+  .block h2 small{display:block;font-family:"Hanken Grotesk";font-weight:600;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin-top:7px}
+  .item{margin:0 0 16px}
+  .item:last-child{margin-bottom:0}
+  .do{font-weight:700;font-size:16.5px;color:var(--paper);display:block}
+  .why{display:block;margin-top:3px;font-size:14.5px;color:var(--paper-faint);font-style:italic;font-family:"Fraunces",serif;line-height:1.45}
+  .why b{color:var(--paper-dim);font-style:italic;font-weight:600}
+  .block.key{background:linear-gradient(180deg,rgba(255,138,30,.06),transparent);border-radius:6px;padding-left:16px;padding-right:16px;margin-left:-16px;margin-right:-16px}
+  .block.key .num{color:var(--amber);-webkit-text-stroke:0}
+
+  /* ROUTINE CARD */
+  .routine{margin:70px 0 0;background:var(--paper);color:var(--ink);border-radius:12px;padding:40px 36px 34px;position:relative;overflow:hidden;box-shadow:0 26px 64px rgba(0,0,0,.55),0 0 0 1px rgba(255,138,30,.45)}
+  .routine::before{content:"";position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,var(--gold),var(--amber),var(--amber-deep))}
+  .r-eyebrow{font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:var(--amber-deep);font-weight:700;margin:4px 0 4px}
+  .r-title{font-family:"Fraunces",serif;font-weight:900;font-size:clamp(28px,5.5vw,40px);line-height:.98;letter-spacing:-.02em;margin:0 0 6px;color:var(--ink)}
+  .r-sub{color:#5b5347;font-size:14.5px;margin:0 0 28px}
+  .r-cols{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+  .r-col h3{display:flex;align-items:center;gap:10px;font-family:"Fraunces",serif;font-weight:900;font-size:21px;margin:0 0 18px;color:var(--ink);padding-bottom:13px;border-bottom:2px solid rgba(232,101,10,.28)}
+  .r-col h3 svg{width:23px;height:23px;flex:none}
+  .r-col ol{list-style:none;counter-reset:step;margin:0;padding:0}
+  .r-col li{counter-increment:step;position:relative;padding:0 0 14px 36px;font-size:15px;line-height:1.46;color:#2c2823}
+  .r-col li::before{content:counter(step);position:absolute;left:0;top:1px;width:23px;height:23px;border-radius:50%;background:var(--ink);color:var(--paper);font-family:"Hanken Grotesk";font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .r-col li:last-child{padding-bottom:0}
+  .r-edit{margin:26px 0 0;text-align:right}
+  .r-edit button{appearance:none;background:none;border:1px solid rgba(232,101,10,.4);border-radius:7px;color:var(--amber-deep);font-family:inherit;font-size:12.5px;font-weight:700;letter-spacing:.06em;padding:8px 14px;cursor:pointer}
+  .r-edit button:hover{background:rgba(232,101,10,.08)}
+
+  /* RESTDAY */
+  .restday{margin:30px 0 0;display:flex;gap:16px;align-items:flex-start;padding:20px 22px;border:1px solid rgba(255,138,30,.4);border-radius:10px;background:linear-gradient(180deg,rgba(255,138,30,.06),transparent)}
+  .restday .ic{flex:none;width:42px;height:42px;border-radius:50%;background:rgba(255,138,30,.14);display:flex;align-items:center;justify-content:center}
+  .restday .ic svg{width:23px;height:23px}
+  .restday h3{font-family:"Fraunces",serif;font-weight:900;font-size:19px;margin:0 0 6px;color:var(--paper)}
+  .restday h3 span{color:var(--amber)}
+  .restday p{margin:0;font-size:14.5px;color:var(--paper-dim);line-height:1.5}
+  .restday p b{color:var(--paper)}
+  .restday .rw{margin-top:8px;font-family:"Fraunces",serif;font-style:italic;color:var(--paper-faint);font-size:14px}
+
+  /* CREED */
+  .creed{margin-top:72px;padding:40px 34px;background:var(--ink-2);border:1px solid var(--line);border-radius:6px;position:relative;overflow:hidden}
+  .creed::after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,138,30,.18),transparent 70%)}
+  .creed .sec-label{margin-top:0}
+  .rule{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:baseline;padding:18px 0;position:relative;z-index:1}
+  .rule + .rule{border-top:1px solid var(--line)}
+  .rule .n{font-family:"Fraunces",serif;font-weight:900;font-size:30px;color:var(--amber)}
+  .rule p{margin:0;font-family:"Fraunces",serif;font-weight:600;font-size:clamp(18px,2.6vw,22px);line-height:1.3;color:var(--paper)}
+
+  /* FOOTER */
+  .foot{margin-top:54px;text-align:center}
+  .foot p{font-family:"Fraunces",serif;font-style:italic;font-size:18px;color:var(--paper-dim);margin:0}
+  .foot .small{font-family:"Hanken Grotesk";font-style:normal;font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--amber-deep);margin-top:18px;font-weight:700}
+
+  /* TRACKER / HEUTE */
+  .tr-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:34px}
+  .tr-head h2{font-family:"Fraunces",serif;font-weight:900;font-size:23px;margin:0;color:var(--paper)}
+  .tr-date{font-size:13px;color:var(--paper-faint);font-weight:600}
+  .daynav{display:flex;align-items:center;gap:10px}
+  .daynav button{appearance:none;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--paper-dim);font-size:17px;line-height:1;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;padding:0 0 2px}
+  .daynav button:hover:not(:disabled){border-color:rgba(255,138,30,.55);color:var(--amber)}
+  .daynav button:disabled{opacity:.3;cursor:default}
+  .tr-hello{margin:16px 0 0;font-family:"Fraunces",serif;font-style:italic;font-size:18px;color:var(--gold);line-height:1.4}
+  .restnote{margin:24px 0 0;display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid rgba(255,138,30,.4);border-radius:8px;font-size:13.5px;color:var(--paper-dim);background:linear-gradient(90deg,rgba(255,138,30,.07),transparent)}
+  .restnote b{color:var(--amber)}
+  .habits{margin:22px 0 0;display:grid;gap:10px}
+  .habit{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;cursor:pointer;-webkit-user-select:none;user-select:none;transition:border-color .15s,background .15s}
+  .habit:hover{border-color:rgba(255,138,30,.5)}
+  .habit.done{background:linear-gradient(90deg,rgba(255,138,30,.10),transparent);border-color:rgba(255,138,30,.55)}
+  .habit .box{width:26px;height:26px;border-radius:7px;border:2px solid var(--paper-faint);flex:none;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .habit.done .box{background:var(--amber);border-color:var(--amber)}
+  .habit .box svg{width:15px;height:15px;opacity:0;transform:scale(.5);transition:.15s}
+  .habit.done .box svg{opacity:1;transform:scale(1)}
+  .habit .label{font-size:15.5px;font-weight:600;color:var(--paper-dim)}
+  .habit.done .label{color:#fff}
+  .hgroup{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--amber);font-weight:700;margin:20px 0 0;padding-left:2px}
+  .hgroup:first-child{margin-top:0}
+  .habit.rest{opacity:.55}
+  .habit .label em{font-style:normal;color:var(--amber);font-size:12px;letter-spacing:.03em}
+  .mini{margin:14px 2px 0;font-size:13px;color:var(--paper-faint)}
+
+  /* MOOD */
+  .mood{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mood button{appearance:none;width:40px;height:40px;border-radius:9px;border:1px solid var(--line);background:none;cursor:pointer;color:#564e42;display:flex;align-items:center;justify-content:center;transition:.15s;padding:0}
+  .mood button svg{width:20px;height:20px}
+  .mood button:hover{border-color:rgba(255,138,30,.5)}
+  .mood button.on{border-color:var(--amber);color:var(--amber);background:rgba(255,138,30,.08)}
+  .mood .mlab{margin-left:6px;font-family:"Fraunces",serif;font-style:italic;font-size:14.5px;color:var(--paper-dim)}
+
+  /* STATS / PANELS */
+  .stats{margin:30px 0 0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .stat{background:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:18px 12px;text-align:center}
+  .stat .big{font-family:"Fraunces",serif;font-weight:900;font-size:30px;color:var(--amber);line-height:1}
+  .stat .lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-faint);margin-top:9px;font-weight:600;line-height:1.3}
+  .panelbox{margin:34px 0 0;background:var(--ink-2);border:1px solid var(--line);border-radius:10px;padding:24px 24px}
+  .panelbox h3{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--amber);font-weight:700;margin:0 0 16px}
+  .insight{display:flex;gap:12px;align-items:flex-start;padding:11px 0;font-size:15px;line-height:1.5;color:var(--paper-dim);border-top:1px solid var(--line)}
+  .insight:first-child{border-top:none;padding-top:0}
+  .insight .dot2{flex:none;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-top:8px}
+  .insight b{color:#fff;font-weight:700}
+  .bars{display:grid;gap:13px}
+  .bar-row{display:grid;gap:6px}
+  .bar-row .bl{display:flex;justify-content:space-between;font-size:13.5px;color:var(--paper-dim)}
+  .bar-row .bl b{color:var(--paper);font-weight:600}
+  .bar-track{height:8px;border-radius:5px;background:#241f19;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--amber-deep),var(--amber));border-radius:5px;transition:width .3s}
+  .reflect textarea{width:100%;min-height:90px;resize:vertical;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--paper);font-family:"Hanken Grotesk",sans-serif;font-size:15px;line-height:1.5;padding:14px 14px}
+  .reflect textarea.short{min-height:56px}
+  .reflect textarea:focus{outline:none;border-color:rgba(255,138,30,.6)}
+  .reflect .hint{font-size:13px;color:var(--paper-faint);margin:0 0 12px;font-style:italic;font-family:"Fraunces",serif}
+  .reflect .saved{font-size:12px;color:var(--amber);margin:8px 0 0;height:14px}
+  .prevref{font-family:"Fraunces",serif;font-style:italic;color:var(--paper-faint);font-size:14px;line-height:1.5;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+  .heat-wrap{margin:34px 0 0}
+  .heat-title{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--paper-faint);font-weight:700;margin:0 0 12px}
+  .heat{display:grid;grid-template-columns:repeat(14,1fr);gap:6px}
+  .cell{aspect-ratio:1;border-radius:4px;background:#211e19}
+  .cell.l1{background:rgba(255,138,30,.30)}
+  .cell.l2{background:rgba(255,138,30,.62)}
+  .cell.l3{background:var(--amber)}
+  .cell.now{box-shadow:0 0 0 2px rgba(255,194,77,.55)}
+  .tr-note{margin:30px 0 0;font-family:"Fraunces",serif;font-style:italic;color:var(--paper-dim);font-size:15px;line-height:1.5}
+
+  /* BUCH */
+  .searchbox{margin:22px 0 0}
+  .searchbox input{width:100%;background:var(--ink-2);border:1px solid var(--line);border-radius:8px;color:var(--paper);font-family:inherit;font-size:14.5px;padding:11px 14px}
+  .searchbox input:focus{outline:none;border-color:rgba(255,138,30,.6)}
+  .entry{padding:20px 0;border-bottom:1px solid var(--line)}
+  .entry .ed{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);font-weight:700}
+  .entry .ed .fl{display:inline-flex;gap:2px;color:var(--amber)}
+  .entry .ed .fl svg{width:12px;height:12px}
+  .entry .eline{font-family:"Fraunces",serif;font-style:italic;font-size:17px;color:var(--paper);margin:10px 0 0;line-height:1.4}
+  .entry .etxt{font-size:14.5px;color:var(--paper-dim);margin:8px 0 0;white-space:pre-wrap;line-height:1.5}
+  .entry .etag{color:var(--paper-faint);font-size:11px;text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-right:7px}
+  .empty{margin:26px 0 0;font-family:"Fraunces",serif;font-style:italic;color:var(--paper-faint);font-size:15px}
+  .pillrow{display:flex;gap:8px;margin:20px 0 0;flex-wrap:wrap}
+  .pill{appearance:none;background:none;border:1px solid var(--line);border-radius:999px;color:var(--paper-faint);font-family:inherit;font-size:12.5px;font-weight:700;letter-spacing:.04em;padding:7px 15px;cursor:pointer;transition:.15s}
+  .pill:hover{color:var(--paper-dim)}
+  .pill.on{color:var(--amber);border-color:rgba(255,138,30,.6);background:rgba(255,138,30,.07)}
+  .qrow{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
+  .qrow .qt{flex:1;min-width:0}
+  .qrow .qt p{margin:0;font-family:"Fraunces",serif;font-style:italic;font-size:16px;color:var(--paper);line-height:1.4}
+  .qrow .qt span{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--paper-faint);font-weight:700;margin-top:7px}
+  .qrow .qt span i{font-style:normal;color:var(--amber)}
+  .addq{margin:22px 0 0;display:grid;gap:10px}
+  .addq input,.addq textarea{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--paper);font-family:inherit;font-size:14.5px;padding:11px 14px;resize:vertical}
+  .addq textarea{min-height:64px;font-family:"Fraunces",serif;font-style:italic;font-size:15.5px}
+  .addq input:focus,.addq textarea:focus{outline:none;border-color:rgba(255,138,30,.6)}
+
+  /* BUTTONS / EDITOR */
+  .btn{appearance:none;background:var(--amber);color:var(--ink);border:none;border-radius:8px;padding:11px 18px;font-family:inherit;font-weight:700;font-size:14px;letter-spacing:.02em;cursor:pointer;transition:.15s}
+  .btn:hover{background:var(--gold)}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--paper-dim)}
+  .btn.ghost:hover{border-color:rgba(255,138,30,.55);color:var(--amber);background:none}
+  .btn.danger{background:none;border:1px solid rgba(220,60,40,.5);color:#e07a66}
+  .btn.danger:hover{background:rgba(220,60,40,.08)}
+  .ib{appearance:none;flex:none;width:32px;height:32px;border:1px solid var(--line);background:none;color:var(--paper-faint);border-radius:7px;cursor:pointer;font-size:14px;line-height:1;transition:.15s;display:flex;align-items:center;justify-content:center;padding:0}
+  .ib:hover:not(:disabled){border-color:rgba(255,138,30,.55);color:var(--amber)}
+  .ib:disabled{opacity:.25;cursor:default}
+  .ib.on{color:var(--gold);border-color:rgba(255,194,77,.5)}
+  .erow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .erow.off{opacity:.45}
+  .erow input[type=text]{flex:1;min-width:140px;background:var(--ink-2);border:1px solid var(--line);border-radius:7px;color:var(--paper);font-family:inherit;font-size:14px;padding:9px 11px}
+  .erow input[type=text]:focus{outline:none;border-color:rgba(255,138,30,.6)}
+  .erow select{background:var(--ink-2);border:1px solid var(--line);border-radius:7px;color:var(--paper-dim);font-family:inherit;font-size:13px;padding:9px 8px;cursor:pointer}
+  .erow label.cb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--paper-faint);cursor:pointer;white-space:nowrap}
+  .erow label.cb input{accent-color:var(--amber)}
+  .addrow{display:flex;gap:8px;margin:18px 0 0;flex-wrap:wrap}
+  .addrow input[type=text]{flex:1;min-width:160px;background:var(--ink-2);border:1px solid var(--line);border-radius:7px;color:var(--paper);font-family:inherit;font-size:14px;padding:10px 12px}
+  .addrow input[type=text]:focus{outline:none;border-color:rgba(255,138,30,.6)}
+  .addrow select{background:var(--ink-2);border:1px solid var(--line);border-radius:7px;color:var(--paper-dim);font-family:inherit;font-size:13px;padding:10px 8px}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .setrow .sl{font-size:14.5px;color:var(--paper-dim);font-weight:600}
+  .setrow .sl small{display:block;font-weight:400;font-size:12.5px;color:var(--paper-faint);margin-top:2px}
+  .setrow input[type=text],.setrow select{background:var(--ink-2);border:1px solid var(--line);border-radius:7px;color:var(--paper);font-family:inherit;font-size:14px;padding:9px 12px}
+  .setrow input[type=text]:focus,.setrow select:focus{outline:none;border-color:rgba(255,138,30,.6)}
+  .logrow{display:flex;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;color:var(--paper-dim);line-height:1.45}
+  .logrow .ld{flex:none;font-size:11.5px;color:var(--amber);font-weight:700;letter-spacing:.06em;margin-top:3px;width:74px}
+  .btnrow{display:flex;gap:10px;margin:20px 0 0;flex-wrap:wrap}
+  .note{font-size:13px;color:var(--paper-faint);margin:14px 0 0;line-height:1.5}
+  .ed-cols{display:grid;grid-template-columns:1fr 1fr;gap:30px}
+
+  @media (max-width:560px){
+    .block{grid-template-columns:54px 1fr;gap:14px}
+    .num{font-size:40px}
+    .wrap{padding:42px 18px 70px}
+    .r-cols{grid-template-columns:1fr;gap:28px}
+    .routine{padding:34px 22px 26px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .heat{grid-template-columns:repeat(10,1fr)}
+    .ed-cols{grid-template-columns:1fr;gap:10px}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <p class="eyebrow">Projekt — Dein zukünftiges Ich</p>
+  <h1>Ein Tag,<br>der dich <span class="glow">dahin</span> bringt.</h1>
+  <p class="lede">Nicht ab morgen ein anderer Mensch. Nur diese paar Dinge, immer wieder — bis sie normal sind.</p>
+
+  <div class="tabnav" id="tabnav">
+    <button class="active" data-tab="tab-heute">Heute</button>
+    <button data-tab="tab-plan">Der Weg</button>
+    <button data-tab="tab-buch">Das Buch</button>
+    <button data-tab="tab-progress">Fortschritt</button>
+    <button data-tab="tab-edit">Anpassen</button>
+  </div>
+
+  <!-- ===================== TAB: HEUTE ===================== -->
+  <div class="panel active" id="tab-heute">
+
+    <div class="tr-head">
+      <h2 id="dayTitle">Heute</h2>
+      <div class="daynav">
+        <button id="dayPrev" aria-label="Vorheriger Tag">‹</button>
+        <span class="tr-date" id="trDate"></span>
+        <button id="dayNext" aria-label="Nächster Tag">›</button>
+      </div>
+    </div>
+    <p class="tr-hello" id="trHello"></p>
+
+    <div id="qcard"></div>
+
+    <div id="restNote"></div>
+
+    <div class="habits" id="habits"></div>
+    <p class="mini" id="miniStat"></p>
+
+    <div class="panelbox">
+      <h3>Wie war der Tag?</h3>
+      <div class="mood" id="mood"></div>
+    </div>
+
+    <div class="panelbox reflect">
+      <h3>Abend — ins Buch</h3>
+      <p class="hint">Was hab ich heute GEMACHT (nicht gedacht)?</p>
+      <textarea id="jDone" placeholder="Drei Zeilen reichen…"></textarea>
+      <p class="hint" style="margin-top:16px">Eine ehrliche Zeile: Wie ging&rsquo;s mir wirklich?</p>
+      <textarea id="jFeel" class="short" placeholder="Nicht reinfressen — benennen."></textarea>
+      <p class="saved" id="jSaved"></p>
+    </div>
+
+    <p class="tr-note">Eine Lücke ist kein Rückschritt. Es gibt hier keine Serie, die kaputtgehen kann — was zählt, ist nur, dass du wiederkommst.</p>
+
+  </div>
+
+  <!-- ===================== TAB: DER WEG (Leitfaden) ===================== -->
+  <div class="panel" id="tab-plan">
+
+    <div class="banner">
+      <p class="qtext">Die einzige Macht, die dir keiner nehmen kann, ist die über <em>dich selbst</em>.</p>
+    </div>
+
+    <p class="sec-label">Der Tag</p>
+    <hr class="sec-rule">
+
+    <div class="block">
+      <div class="num">01</div>
+      <div>
+        <h2>Morgens</h2>
+        <div class="item"><span class="do">Feste Aufstehzeit: ~6:30–6:45 (schultags). Am Wochenende max. ~1,5 Std später, also bis ~8:15 raus.</span><span class="why">Dein Anker — der erste Sieg, bevor irgendwer was von dir will. Deine innere Uhr hängt an der <b>Aufstehzeit</b>, nicht an der Schlafenszeit: stabil raus → die Müdigkeit kommt abends von selbst. <i>(Zeiten für Schulstart ~8:00 — sonst entsprechend verschieben.)</i></span></div>
+        <div class="item"><span class="do">10 Min laufen / spazieren gehen (oder Liegestütze — irgendwas in Bewegung).</span><span class="why">Nicht für den Körper — dafür, dass du den Tag mit einem <b>gehaltenen Versprechen an dich selbst</b> startest.</span></div>
+        <div class="item"><span class="do">1 guter Input — und dann EINE eigene Zeile dazu.</span><span class="why">Du liebst kluge Worte. Wer sie nur hört, konsumiert. Wer eine eigene Zeile schreibt, denkt — so wirst du der, zu dem man kommt. <i>Dafür gibt&rsquo;s auf „Heute" jeden Tag ein Zitat und eine Zeile zum Selberschreiben.</i></span></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="num">02</div>
+      <div>
+        <h2>Schule <small>→ bald Ausbildung</small></h2>
+        <div class="item"><span class="do">Das Nötigste reicht — außer Mathe &amp; Deutsch.</span><span class="why">Dein Schnitt steht. Die zwei Prüfungen sind das Einzige mit hartem Stichtag.</span></div>
+        <div class="item"><span class="do">3×/Woche 30 Min gezielt Prüfungs­format üben.</span><span class="why">Nicht „lernen", sondern genau die Aufgabentypen, die drankommen. Mehr braucht&rsquo;s nicht.</span></div>
+      </div>
+    </div>
+
+    <div class="block key">
+      <div class="num">03</div>
+      <div>
+        <h2>Nachmittag <small>hier liegt dein hebel</small></h2>
+        <div class="item"><span class="do">1 Stunde an einem echten Projekt / Kundenauftrag.</span><span class="why">Das ist dein Unternehmen im Maßstab 1:1000. Jede Stunde ist eine <b>Aktie auf dein Lebenswerk</b>.</span></div>
+        <div class="item"><span class="do">Pro Session: EIN Stück selbst bauen, nicht nur KI.</span><span class="why">So wirst du wirklich besser drin — und unabhängig vom Tool.</span></div>
+        <div class="item"><span class="do">Mittags / nachmittags: 15–30 Min Sport.</span><span class="why">Dein alter Ausgleich. Klein anfangen, nicht sofort der Alte sein wollen.</span></div>
+        <div class="item"><span class="do">DANN zocken — mit hartem Ende (z.&nbsp;B. 21:30 Controller weg).</span><span class="why">Spielen ist erlaubt. Aber den Controller wegzulegen, wenn du&rsquo;s gesagt hast, <b>ist</b> die Macht, die du suchst.</span></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="num">04</div>
+      <div>
+        <h2>Abends</h2>
+        <div class="item"><span class="do">Schlaf-Ablauf — Schultage: 21:30 fertigmachen (Maske, Licht runter) · 22:00 ins Bett · ~22:30 eingeschlafen → 8 Std bis 6:30.<br>Wochenende / Ferien: 23:00 fertigmachen · 23:30 ins Bett · ~0:00 eingeschlafen → 8 Std bis 8:00.</span><span class="why">Schlaf klopft das Gelernte fest — Mathe &amp; Deutsch wandern <b>nachts</b> ins Langzeitgedächtnis. Die Zeiten sind ein Anhaltspunkt, keine Stoppuhr: 8 oder 9 Stunden sind beide gut.</span></div>
+        <div class="item"><span class="do">5 Min: Was hab ich heute GEMACHT (nicht gedacht)?</span><span class="why">Du grübelst viel. Schreiben macht aus Grübeln Handlung — und zeigt dir schwarz auf weiß, dass du vorankommst.</span></div>
+        <div class="item"><span class="do">+ 1 ehrliche Zeile: Wie ging&rsquo;s mir heute wirklich?</span><span class="why">Das Üben fürs echte Reden. Nicht reinfressen, nicht in andere reindrücken — <b>benennen</b>.</span></div>
+      </div>
+    </div>
+
+    <p class="sec-label">Nicht täglich — einmal die Woche</p>
+    <hr class="sec-rule">
+
+    <div class="block" style="border-bottom:none">
+      <div class="num">05</div>
+      <div>
+        <h2>Wöchentlich</h2>
+        <div class="item"><span class="do">Energie schützen: Merk den Moment, wenn der Schmerz anderer zu deinem wird — und leg ihn ab.</span><span class="why">Du kannst jemanden lieben, ohne sein Schwamm zu sein.</span></div>
+        <div class="item"><span class="do">Sobald Kundengeld kommt: fester kleiner Betrag auf die Schulden — automatisch.</span><span class="why">Schulden killt man mit Langeweile, nicht mit großen Aktionen.</span></div>
+        <div class="item"><span class="do">Sonntags 5 Min: Wochen-Review im Fortschritt-Tab — und EINE Stellschraube an der Routine prüfen.</span><span class="why">Dein Plan ist kein Denkmal. Er ist ein Werkzeug — und Werkzeuge schärft man nach.</span></div>
+      </div>
+    </div>
+
+    <p class="sec-label">Das Fundament — läuft im Hintergrund</p>
+    <hr class="sec-rule">
+
+    <div class="block" style="border-bottom:none">
+      <div class="num">06</div>
+      <div>
+        <h2>Basics <small>richtwerte, keine prüfung</small></h2>
+        <div class="item"><span class="do">Schlaf: Schulnächte ~22:30 aus → 6:30 raus (~8 Std). Ferien/Wochenende feste Zeit, ~8 Uhr raus (~8–9 Std).</span><span class="why">Die Aufstehzeit ist der Anker, nicht die Schlafenszeit.</span></div>
+        <div class="item"><span class="do">Trinken: grob 2–3 Liter über den Tag, mehr bei Sport oder Hitze.</span><span class="why">Nicht zählen — der Check ist die Farbe vom Urin: hell = passt.</span></div>
+        <div class="item"><span class="do">Bewegung: morgens 10 Min laufen + mittags 15–30 Min Sport. Lieber jeden Tag etwas, mit Ruhetagen.</span><span class="why">Ziel ist <b>mehr Energie</b> — nicht Strafe, nicht Pflicht-Abarbeiten.</span></div>
+      </div>
+    </div>
+
+    <!-- ROUTINE (wird aus deinen Daten gerendert — anpassbar unter „Anpassen") -->
+    <div class="routine">
+      <p class="r-eyebrow">Was du gerade lebst</p>
+      <h2 class="r-title">Deine Routine</h2>
+      <p class="r-sub" id="routineSub">Morgens und abends — der Ablauf, den du dir selbst aufgebaut hast. Er darf sich verändern, wenn du dich veränderst.</p>
+      <div class="r-cols">
+        <div class="r-col">
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="#e8650a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.4" fill="#ff8a1e" stroke="none"/><line x1="12" y1="1.6" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.4"/><line x1="1.6" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.4" y2="12"/><line x1="4.4" y1="4.4" x2="6.1" y2="6.1"/><line x1="17.9" y1="17.9" x2="19.6" y2="19.6"/><line x1="4.4" y1="19.6" x2="6.1" y2="17.9"/><line x1="17.9" y1="6.1" x2="19.6" y2="4.4"/></svg>Morgen</h3>
+          <ol id="routineMorning"></ol>
+        </div>
+        <div class="r-col">
+          <h3><svg viewBox="0 0 24 24"><path d="M20.5 14A8.5 8.5 0 1 1 10 3.5 6.6 6.6 0 0 0 20.5 14z" fill="#ff8a1e" stroke="#e8650a" stroke-width="1.4" stroke-linejoin="round"/></svg>Abend</h3>
+          <ol id="routineEvening"></ol>
+        </div>
+      </div>
+      <div class="r-edit"><button data-goto="tab-edit">Routine anpassen →</button></div>
+    </div>
+
+    <!-- RESTDAY -->
+    <div class="restday" id="restdayCard">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#ff8a1e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8z"/></svg></div>
+      <div>
+        <h3><span id="restdayName">Dienstag</span> — <span>Restday</span></h3>
+        <p>Kein Morgen-Vollprogramm (Skincare / Fertigmachen), <b>kein Laufen, kein Sport</b>. Bewusst runterfahren und auftanken.</p>
+        <p class="rw">Ruhetage sind kein Faulsein — der Körper baut in der Pause auf, und ein fixer Restday hält dich langfristig dran. Gehört zum Plan, nicht dagegen.</p>
+      </div>
+    </div>
+
+    <!-- CREED -->
+    <div class="creed">
+      <p class="sec-label">Die zwei Regeln, die alles tragen</p>
+      <div class="rule"><span class="n">I</span><p>Disziplin ist die Macht über den Einzigen, der wirklich zählt: dich.</p></div>
+      <div class="rule"><span class="n">II</span><p>Sag, was in dir ist. Nicht reinfressen, nicht reindrücken — aussprechen.</p></div>
+    </div>
+
+    <div class="foot">
+      <p>Nicht der perfekte Tag. 4.000 mittelmäßige Tage, an denen du es trotzdem tust.</p>
+      <p class="small">Da kommst du hin.</p>
+    </div>
+
+  </div>
+
+  <!-- ===================== TAB: DAS BUCH ===================== -->
+  <div class="panel" id="tab-buch">
+
+    <p class="sec-label">Dein Buch</p>
+    <hr class="sec-rule">
+    <div class="tr-head">
+      <h2>Zeilen &amp; Tage</h2>
+      <span class="tr-date" id="buchCount"></span>
+    </div>
+    <p class="tr-hello">Alles, was du festhältst, landet hier — Tag für Tag. Dein Buch schreibt sich von selbst, während du lebst.</p>
+    <div class="searchbox"><input id="buchSearch" type="text" placeholder="Im Buch suchen…"></div>
+    <div id="buchFeed"></div>
+
+    <p class="sec-label">Zitate — Worte, die tragen</p>
+    <hr class="sec-rule">
+    <div class="pillrow" id="qFilter">
+      <button class="pill on" data-f="alle">Alle</button>
+      <button class="pill" data-f="fav">Favoriten</button>
+      <button class="pill" data-f="eigene">Eigene</button>
+    </div>
+    <div class="addq">
+      <textarea id="newQuoteText" placeholder="Eine Zeile, die du behalten willst — gehört oder selbst geschrieben…"></textarea>
+      <div class="addrow" style="margin:0">
+        <input type="text" id="newQuoteAuthor" placeholder="Von wem? (leer = von dir)">
+        <button class="btn" id="addQuoteBtn">Aufnehmen</button>
+      </div>
+    </div>
+    <div id="qList"></div>
+
+  </div>
+
+  <!-- ===================== TAB: FORTSCHRITT ===================== -->
+  <div class="panel" id="tab-progress">
+
+    <p class="sec-label">Dein Fortschritt</p>
+    <hr class="sec-rule">
+    <div class="tr-head">
+      <h2>Was die Tage erzählen</h2>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="panelbox">
+      <h3>Was dir auffällt — dein Ratgeber</h3>
+      <div id="insights"></div>
+    </div>
+
+    <div class="panelbox">
+      <h3>Pro Gewohnheit — letzte 30 Tage</h3>
+      <div class="bars" id="bars"></div>
+    </div>
+
+    <div class="panelbox reflect">
+      <h3>Wochen-Review — nachschärfen, nicht verurteilen</h3>
+      <p class="hint">Was lief diese Woche? Was hat dich gebremst? Und: Welche EINE Stellschraube änderst du nächste Woche?</p>
+      <textarea id="reflect" placeholder="Schreib los…"></textarea>
+      <p class="saved" id="reflectSaved"></p>
+      <div id="prevReflect"></div>
+      <div class="btnrow"><button class="btn ghost" data-goto="tab-edit">→ Routine jetzt anpassen</button></div>
+    </div>
+
+    <div class="heat-wrap">
+      <p class="heat-title">Letzte 8 Wochen — jeder Punkt ein Tag</p>
+      <div class="heat" id="heat"></div>
+    </div>
+
+    <p class="tr-note">Eine Lücke ist kein Rückschritt. Es gibt hier keine Serie, die kaputtgehen kann — was zählt, ist nur, dass du wiederkommst.</p>
+
+  </div>
+
+  <!-- ===================== TAB: ANPASSEN ===================== -->
+  <div class="panel" id="tab-edit">
+
+    <p class="sec-label">Dein System — heute so, morgen besser</p>
+    <hr class="sec-rule">
+    <p class="tr-hello">Das hier ist deine aktuelle Version, nicht deine endgültige. Ändere wenig, aber bewusst — eine Stellschraube pro Woche reicht.</p>
+
+    <div class="panelbox">
+      <h3>Gewohnheiten zum Abhaken</h3>
+      <div id="habitEditor"></div>
+      <div class="addrow">
+        <input type="text" id="newHabitLabel" placeholder="Neue Gewohnheit…">
+        <select id="newHabitGroup"><option>Morgens</option><option>Tag</option><option>Abend</option></select>
+        <button class="btn" id="addHabitBtn">Hinzufügen</button>
+      </div>
+      <p class="note">Pausieren (⏸) blendet eine Gewohnheit aus, ohne die Historie zu löschen. Löschen (✕) entfernt sie aus der Liste — die alten Tage bleiben gezählt.</p>
+    </div>
+
+    <div class="panelbox">
+      <h3>Morgen- &amp; Abendroutine</h3>
+      <div class="ed-cols">
+        <div>
+          <p class="hgroup" style="margin-top:0">Morgen</p>
+          <div id="routineEditM"></div>
+          <div class="addrow"><input type="text" id="newStepM" placeholder="Neuer Schritt…"><button class="btn ghost" id="addStepM">+</button></div>
+        </div>
+        <div>
+          <p class="hgroup" style="margin-top:0">Abend</p>
+          <div id="routineEditE"></div>
+          <div class="addrow"><input type="text" id="newStepE" placeholder="Neuer Schritt…"><button class="btn ghost" id="addStepE">+</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panelbox">
+      <h3>Einstellungen</h3>
+      <div class="setrow">
+        <span class="sl">Dein Name<small>Für die Begrüßung.</small></span>
+        <input type="text" id="setName">
+      </div>
+      <div class="setrow" style="border-bottom:none">
+        <span class="sl">Restday<small>An dem Tag sind markierte Gewohnheiten frei.</small></span>
+        <select id="setRestday">
+          <option value="-1">Kein Restday</option>
+          <option value="0">Sonntag</option><option value="1">Montag</option><option value="2">Dienstag</option>
+          <option value="3">Mittwoch</option><option value="4">Donnerstag</option><option value="5">Freitag</option>
+          <option value="6">Samstag</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panelbox">
+      <h3>Dein Weg verändert sich — Logbuch</h3>
+      <div id="changelog"></div>
+      <p class="note">Jede Anpassung landet hier automatisch. So siehst du in einem Jahr, wie sich dein System entwickelt hat — das Werkzeug wächst mit dir.</p>
+    </div>
+
+    <div class="panelbox">
+      <h3>Deine Daten</h3>
+      <p class="note" style="margin:0 0 6px">Alles liegt nur in diesem Browser. Einmal im Monat exportieren = nichts kann verloren gehen. Das Backup lässt sich auf jedem Gerät wieder einlesen.</p>
+      <div class="btnrow">
+        <button class="btn ghost" id="exportBtn">Backup exportieren</button>
+        <button class="btn ghost" id="importBtn">Backup einlesen</button>
+        <button class="btn danger" id="resetBtn">Alles zurücksetzen</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+    </div>
+
+  </div>
+
+</div>
+
+<noscript><p style="max-width:640px;margin:30px auto;text-align:center;color:#b9ad99;font-family:sans-serif">Diese Seite braucht JavaScript — sie speichert deine Haken und Zeilen direkt im Browser.</p></noscript>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ============================== Helfer ============================== */
+  var WD=['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  var GROUPS=['Morgens','Tag','Abend'];
+  var MOODS=['Schwer','Zäh','Okay','Gut','Stark'];
+  var MAXBACK=27; /* so weit lässt sich zurückblättern (= Heatmap-Fenster) */
+
+  function pad(n){return n<10?'0'+n:''+n;}
+  function dstr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+  function parseD(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+  function dateMinus(n){var d=new Date();d.setDate(d.getDate()-n);return d;}
+  function today(){return dstr(new Date());}
+  function daysAgo(ds){return Math.round((parseD(today())-parseD(ds))/86400000);}
+  function fmtLong(ds){try{return parseD(ds).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});}catch(e){return ds;}}
+  function fmtShort(ds){try{return parseD(ds).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});}catch(e){return ds;}}
+  function deNum(x){return String(x.toFixed(1)).replace('.',',');}
+  function hashStr(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function genId(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+  function isoWeek(d){
+    var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    var day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
+    var ys=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+    var wn=Math.ceil((((t-ys)/86400000)+1)/7);
+    return t.getUTCFullYear()+'-W'+pad(wn);
+  }
+  function prevIsoWeek(){var d=new Date();d.setDate(d.getDate()-7);return isoWeek(d);}
+
+  /* ============================== Speicher ============================== */
+  var mem={};
+  async function getRaw(k){
+    try{ if(window.storage&&window.storage.get){ var r=await window.storage.get(k,false); return r?r.value:null; } }catch(e){}
+    try{ return localStorage.getItem(k); }catch(e){}
+    return mem[k]||null;
+  }
+  async function setRaw(k,v){
+    try{ if(window.storage&&window.storage.set){ await window.storage.set(k,v,false); return; } }catch(e){}
+    try{ localStorage.setItem(k,v); return; }catch(e){}
+    mem[k]=v;
+  }
+
+  /* ============================== Stammdaten ============================== */
+  function seedHabits(){
+    return [
+      {id:'wake',     g:'Morgens', label:'Zur Zeit aufgestanden',                    rest:false},
+      {id:'jog',      g:'Morgens', label:'Joggen / Bewegung früh (10 Min)',          rest:true},
+      {id:'routine',  g:'Morgens', label:'Morgenroutine: Hygiene & fertig gemacht',  rest:true},
+      {id:'inputbook',g:'Morgens', label:'Input + eigene Zeile ins Buch',            rest:false},
+      {id:'school',   g:'Tag',     label:'Schule: Mathe / Deutsch dran',             rest:false},
+      {id:'proj',     g:'Tag',     label:'Am Projekt / Gewerbe gebaut',              rest:false},
+      {id:'sport',    g:'Tag',     label:'Sport (15–30 Min)',                        rest:true},
+      {id:'cutoff',   g:'Abend',   label:'Controller-Endzeit gehalten',              rest:false},
+      {id:'sleeptime',g:'Abend',   label:'Schlafzeit eingehalten',                   rest:false},
+      {id:'journal',  g:'Abend',   label:'Abend-Buch: gemacht + ehrliche Zeile',     rest:false}
+    ];
+  }
+  function seedRoutine(){
+    return {
+      morning:[
+        'Aufstehen — 6:30 (Schultag) / 8:00 (Wochenende)',
+        'Ins Bad, duschen',
+        'Komplette Skincare',
+        'Zähne putzen, Mundspülung, anziehen — fertigmachen',
+        'Raus: 10 Min joggen / laufen',
+        'Frühstück',
+        'Zimmer aufräumen (wenn nötig)',
+        'Ins Buch: ein Zitat zu deinem Leben + eine Sache, die zum Tag passt',
+        'Schule / den Tag vorbereiten',
+        'Loslegen — lernen, helfen, planen, anpacken'
+      ],
+      evening:[
+        'Zur festen Zeit: alles aus, Musik an, LEDs an, Fenster auf, umziehen',
+        'Ins Bad: komplette Routine — Skincare, Zähne putzen',
+        'Ins Buch: Tagebucheintrag — kurz über heute, kurz über morgen',
+        'Hinlegen · Sleeptimer · schlafen'
+      ]
+    };
+  }
+  function seedQuotes(){
+    var Q=[
+      {t:'Die einzige Macht, die dir keiner nehmen kann, ist die über dich selbst.',a:'Dein Leitsatz',own:true,fav:true},
+      {t:'Nicht der perfekte Tag — 4.000 mittelmäßige Tage, an denen du es trotzdem tust.',a:'Dein Plan',own:true,fav:false},
+      {t:'Wir leiden öfter in der Vorstellung als in der Wirklichkeit.',a:'Seneca'},
+      {t:'Es ist nicht wenig Zeit, die wir haben — es ist viel Zeit, die wir nicht nutzen.',a:'Seneca'},
+      {t:'Nicht weil es schwer ist, wagen wir es nicht. Weil wir es nicht wagen, ist es schwer.',a:'Seneca'},
+      {t:'Den Willigen führt das Schicksal, den Unwilligen schleift es mit.',a:'Seneca'},
+      {t:'Arm ist nicht, wer wenig hat, sondern wer mehr begehrt.',a:'Seneca'},
+      {t:'Solange du lebst, lerne, wie man lebt.',a:'Seneca'},
+      {t:'Das Glück deines Lebens hängt von der Beschaffenheit deiner Gedanken ab.',a:'Marc Aurel'},
+      {t:'Wenn dir das Aufstehen schwerfällt, denke: Ich erwache, um das Werk eines Menschen zu tun.',a:'Marc Aurel'},
+      {t:'Nicht die Dinge beunruhigen die Menschen, sondern ihre Urteile über die Dinge.',a:'Epiktet'},
+      {t:'Sage dir zuerst, wer du sein willst — und dann tu, was dazu nötig ist.',a:'Epiktet'},
+      {t:'Auch eine Reise von tausend Meilen beginnt mit dem ersten Schritt.',a:'Laotse'},
+      {t:'Wer andere besiegt, ist stark. Wer sich selbst besiegt, ist mächtig.',a:'Laotse'},
+      {t:'Es ist egal, wie langsam du gehst, solange du nicht stehen bleibst.',a:'Konfuzius'},
+      {t:'Der Tropfen höhlt den Stein nicht durch Kraft, sondern durch beständiges Fallen.',a:'Ovid'},
+      {t:'Wir sind, was wir wiederholt tun. Größe ist daher keine Tat, sondern eine Gewohnheit.',a:'nach Aristoteles'},
+      {t:'Es ist nicht genug zu wissen, man muss auch anwenden. Es ist nicht genug zu wollen, man muss auch tun.',a:'Goethe'},
+      {t:'Der Worte sind genug gewechselt, lasst mich auch endlich Taten sehn.',a:'Goethe'},
+      {t:'Wer ein Warum zum Leben hat, erträgt fast jedes Wie.',a:'Friedrich Nietzsche'},
+      {t:'Man muss noch Chaos in sich haben, um einen tanzenden Stern gebären zu können.',a:'Friedrich Nietzsche'},
+      {t:'„Das ist nun mein Weg — wo ist der eure?" Denn DEN Weg, den gibt es nicht.',a:'Friedrich Nietzsche'},
+      {t:'Sei geduldig gegen alles Ungelöste in deinem Herzen — und versuche, die Fragen selbst lieb zu haben.',a:'Rainer Maria Rilke'},
+      {t:'Wer spricht von Siegen? Überstehn ist alles.',a:'Rainer Maria Rilke'},
+      {t:'Und jedem Anfang wohnt ein Zauber inne, der uns beschützt und der uns hilft, zu leben.',a:'Hermann Hesse'},
+      {t:'Es gibt nichts Gutes, außer: man tut es.',a:'Erich Kästner'},
+      {t:'Ausdauer wird früher oder später belohnt — meistens aber später.',a:'Wilhelm Busch'},
+      {t:'Am Mute hängt der Erfolg.',a:'Theodor Fontane'},
+      {t:'Wanderer, es gibt keinen Weg. Der Weg entsteht, indem du ihn gehst.',a:'Antonio Machado'},
+      {t:'Man sieht nur mit dem Herzen gut. Das Wesentliche ist für die Augen unsichtbar.',a:'Antoine de Saint-Exupéry'},
+      {t:'Vollkommen ist etwas nicht, wenn nichts mehr hinzuzufügen ist, sondern wenn man nichts mehr weglassen kann.',a:'Antoine de Saint-Exupéry'},
+      {t:'Wenn wir eine Situation nicht ändern können, sind wir gefordert, uns selbst zu ändern.',a:'Viktor Frankl'},
+      {t:'Mitten im Winter habe ich erfahren, dass es in mir einen unbesiegbaren Sommer gibt.',a:'Albert Camus'},
+      {t:'Große Dinge entstehen nicht aus einem Impuls, sondern aus einer Kette kleiner Dinge, die zusammenfinden.',a:'Vincent van Gogh'},
+      {t:'Man bemerkt nie, was schon getan wurde — man sieht immer nur, was noch zu tun bleibt.',a:'Marie Curie'},
+      {t:'Ich fürchte nicht den, der 10.000 Tritte einmal geübt hat — sondern den, der einen Tritt 10.000 Mal geübt hat.',a:'Bruce Lee'},
+      {t:'Inspiration existiert. Aber sie muss dich bei der Arbeit finden.',a:'Pablo Picasso'},
+      {t:'Gestern war ich klug und wollte die Welt verändern. Heute bin ich weise und verändere mich selbst.',a:'Rumi'},
+      {t:'Nicht müde werden, sondern dem Wunder leise wie einem Vogel die Hand hinhalten.',a:'Hilde Domin'},
+      {t:'Die beste Zeit, einen Baum zu pflanzen, war vor zwanzig Jahren. Die zweitbeste ist jetzt.',a:'Chinesisches Sprichwort'},
+      {t:'Siebenmal hinfallen, achtmal aufstehen.',a:'Japanisches Sprichwort'},
+      {t:'Kaizen: jeden Tag ein kleines bisschen besser.',a:'Japanisches Prinzip'}
+    ];
+    return Q.map(function(q,i){return {id:'q'+i,t:q.t,a:q.a,own:!!q.own,fav:!!q.fav};});
+  }
+  function defaultState(){
+    return {
+      version:2, name:'Lukas', restday:2, createdAt:today(),
+      habits:seedHabits(), routine:seedRoutine(), quotes:seedQuotes(),
+      checks:{}, journal:{}, reflections:{}, changelog:[]
+    };
+  }
+
+  /* ============================== Zustand ============================== */
+  var KEY='derweg.v2', OLD_KEY='fortschritt', OLD_RKEY='reflexion';
+  var S=null;
+  var viewDay=today();
+  var qfilter='alle', buchQuery='';
+
+  function fix(s){ /* fehlende Felder nach Import/Migration auffüllen */
+    var d=defaultState();
+    if(!s||typeof s!=='object') return d;
+    ['name','restday','createdAt'].forEach(function(k){ if(s[k]===undefined) s[k]=d[k]; });
+    if(!Array.isArray(s.habits)||!s.habits.length) s.habits=d.habits;
+    if(!s.routine||!Array.isArray(s.routine.morning)||!Array.isArray(s.routine.evening)) s.routine=d.routine;
+    if(!Array.isArray(s.quotes)||!s.quotes.length) s.quotes=d.quotes;
+    ['checks','journal','reflections'].forEach(function(k){ if(!s[k]||typeof s[k]!=='object') s[k]={}; });
+    if(!Array.isArray(s.changelog)) s.changelog=[];
+    s.version=2;
+    return s;
+  }
+
+  async function load(){
+    var raw=await getRaw(KEY);
+    if(raw){ try{ S=fix(JSON.parse(raw)); }catch(e){ S=defaultState(); } return; }
+    S=defaultState();
+    /* Migration: Daten der alten Seite übernehmen (gleiche Gewohnheits-IDs) */
+    try{
+      var old=await getRaw(OLD_KEY);
+      if(old){ var oc=JSON.parse(old); if(oc&&typeof oc==='object'){ S.checks=oc; } }
+      var oldr=await getRaw(OLD_RKEY);
+      if(oldr){ var orf=JSON.parse(oldr); if(orf&&typeof orf==='object'){ S.reflections=orf; } }
+      if(old||oldr) S.changelog.push({d:today(),t:'Daten der alten Seite übernommen'});
+    }catch(e){}
+    S.changelog.push({d:today(),t:'Start — Routine Version 1 festgehalten'});
+    await save();
+  }
+  async function save(){ await setRaw(KEY,JSON.stringify(S)); }
+
+  function logChange(text){
+    var t=today();
+    for(var i=S.changelog.length-1;i>=0;i--){
+      var e=S.changelog[i];
+      if(e.d!==t) break;
+      if(e.t===text) return; /* gleiche Meldung am gleichen Tag nicht doppelt */
+    }
+    S.changelog.push({d:t,t:text});
+  }
+
+  /* ============================== Ableitungen ============================== */
+  function activeHabits(){ return S.habits.filter(function(h){return !h.off;}); }
+  function habitById(id){ for(var i=0;i<S.habits.length;i++){ if(S.habits[i].id===id) return S.habits[i]; } return null; }
+  function dayCount(ds){ var o=S.checks[ds]; if(!o) return 0; var c=0; for(var k in o){ if(o[k]) c++; } return c; }
+  function level(n){ var t=Math.max(1,activeHabits().length); if(n<=0) return 0; if(n>=Math.ceil(t*0.7)) return 3; if(n>=Math.ceil(t*0.4)) return 2; return 1; }
+  function daysActiveRange(start,end){ var c=0; for(var i=start;i<end;i++){ if(dayCount(dstr(dateMinus(i)))>=1) c++; } return c; }
+  function daysThisMonth(){ var now=new Date(),c=0; Object.keys(S.checks).forEach(function(k){ var p=k.split('-'); if(+p[0]===now.getFullYear()&&+p[1]===now.getMonth()+1&&dayCount(k)>=1) c++; }); return c; }
+  function totalDays(){ var c=0; Object.keys(S.checks).forEach(function(k){ if(dayCount(k)>=1) c++; }); return c; }
+  function habitCount(id,n){ var c=0; for(var i=0;i<n;i++){ var o=S.checks[dstr(dateMinus(i))]; if(o&&o[id]) c++; } return c; }
+  function journalOf(ds){ if(!S.journal[ds]) S.journal[ds]={}; return S.journal[ds]; }
+  function isRestday(ds){ return S.restday>=0 && parseD(ds).getDay()===S.restday; }
+
+  function quoteForDay(ds){
+    var j=S.journal[ds];
+    if(j&&j.qid){ for(var i=0;i<S.quotes.length;i++){ if(S.quotes[i].id===j.qid) return S.quotes[i]; } }
+    if(!S.quotes.length) return null;
+    return S.quotes[hashStr(ds)%S.quotes.length];
+  }
+
+  /* ============================== Tab-Navigation ============================== */
+  function activateTab(id){
+    document.querySelectorAll('.tabnav button').forEach(function(b){ b.classList.toggle('active',b.getAttribute('data-tab')===id); });
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.toggle('active',p.id===id); });
+    renderAll();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  document.getElementById('tabnav').addEventListener('click',function(ev){
+    var b=ev.target.closest('button[data-tab]'); if(b) activateTab(b.getAttribute('data-tab'));
+  });
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('[data-goto]'); if(b) activateTab(b.getAttribute('data-goto'));
+  });
+
+  /* ============================== HEUTE ============================== */
+  function renderDayHead(){
+    var ago=daysAgo(viewDay);
+    document.getElementById('dayTitle').textContent = ago===0?'Heute':(ago===1?'Gestern':WD[parseD(viewDay).getDay()]);
+    document.getElementById('trDate').textContent = fmtLong(viewDay);
+    document.getElementById('dayPrev').disabled = ago>=MAXBACK;
+    document.getElementById('dayNext').disabled = ago<=0;
+  }
+
+  function renderHello(){
+    var el=document.getElementById('trHello');
+    if(daysAgo(viewDay)>0){ el.textContent='Du blätterst zurück — nachtragen ist erlaubt, schönreden nicht nötig.'; return; }
+    var h=new Date().getHours();
+    var greet = h<5?'Noch wach, '+S.name+'?' : h<11?'Guten Morgen, '+S.name+'.' : h<18?'Guten Tag, '+S.name+'.' : 'Guten Abend, '+S.name+'.';
+    var td=dayCount(viewDay), n=totalDays(), msg;
+    if(n===0){ msg='Erster Tag — hak ab, was du heute schon geschafft hast. Mehr braucht’s nicht.'; }
+    else if(td>=4){ msg='Starker Tag heute. Genau so.'; }
+    else if(td>=1){ msg='Du bist heute dabei — jeder Haken zählt.'; }
+    else { msg=h>=18?'Heute noch nichts notiert? Ein Haken und eine ehrliche Zeile — dann darf der Tag zu Ende sein.':'Such dir eine Sache aus und fang damit an.'; }
+    el.textContent=greet+' '+msg;
+  }
+
+  function renderQuote(){
+    var el=document.getElementById('qcard');
+    var q=quoteForDay(viewDay);
+    if(!q){ el.innerHTML=''; return; }
+    var j=S.journal[viewDay]||{};
+    el.innerHTML=
+      '<div class="banner" style="margin-bottom:0">'+
+        '<p class="qtext">'+esc(q.t)+'</p>'+
+        '<div class="q-meta"><span class="q-author">— '+esc(q.a||'Unbekannt')+'</span>'+
+        '<span class="q-actions">'+
+          '<button class="qbtn'+(q.fav?' on':'')+'" id="qFav">'+(q.fav?'♥ Gemerkt':'♡ Merken')+'</button>'+
+          '<button class="qbtn" id="qShuffle">↻ Anderes</button>'+
+        '</span></div>'+
+      '</div>'+
+      '<div class="qline"><input id="jLine" maxlength="300" placeholder="Deine eigene Zeile dazu — eine reicht." value="'+esc(j.line||'')+'"><p class="saved" id="lineSaved"></p></div>';
+
+    document.getElementById('qFav').addEventListener('click',async function(){
+      q.fav=!q.fav; await save(); renderQuote();
+    });
+    document.getElementById('qShuffle').addEventListener('click',async function(){
+      if(S.quotes.length<2) return;
+      var cur=q.id,nq;
+      do{ nq=S.quotes[Math.floor(Math.random()*S.quotes.length)]; }while(nq.id===cur);
+      journalOf(viewDay).qid=nq.id; await save(); renderQuote();
+    });
+    var li=document.getElementById('jLine'), lt=null;
+    li.addEventListener('input',function(){
+      journalOf(viewDay).line=li.value;
+      if(li.value.trim()) autoCheck('inputbook');
+      if(lt) clearTimeout(lt);
+      lt=setTimeout(async function(){ await save(); flash('lineSaved'); },400);
+    });
+    li.addEventListener('blur',function(){ journalOf(viewDay).line=li.value; save(); });
+  }
+
+  function autoCheck(id){ /* sanfter Automatismus: setzt nur, nimmt nie weg */
+    var h=habitById(id); if(!h||h.off) return;
+    if(!S.checks[viewDay]) S.checks[viewDay]={};
+    if(!S.checks[viewDay][id]){ S.checks[viewDay][id]=true; renderHabits(); renderMini(); }
+  }
+
+  function renderRestNote(){
+    var el=document.getElementById('restNote');
+    el.innerHTML = isRestday(viewDay)
+      ? '<div class="restnote"><span>☾</span><span><b>Restday.</b> Markierte Gewohnheiten sind heute frei — auftanken gehört zum Plan.</span></div>'
+      : '';
+  }
+
+  function renderHabits(){
+    var el=document.getElementById('habits'); el.innerHTML='';
+    var o=S.checks[viewDay]||{}, rest=isRestday(viewDay), lastG=null;
+    GROUPS.forEach(function(g){
+      activeHabits().filter(function(h){return h.g===g;}).forEach(function(h){
+        if(g!==lastG){ var gh=document.createElement('div'); gh.className='hgroup'; gh.textContent=g; el.appendChild(gh); lastG=g; }
+        var done=!!o[h.id], free=rest&&h.rest;
+        var div=document.createElement('div');
+        div.className='habit'+(done?' done':'')+(free?' rest':'');
+        div.innerHTML='<span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="#0d0c0b" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span><span class="label">'+esc(h.label)+(free?' <em>· Restday frei</em>':'')+'</span>';
+        div.addEventListener('click',async function(){
+          if(!S.checks[viewDay]) S.checks[viewDay]={};
+          if(S.checks[viewDay][h.id]) delete S.checks[viewDay][h.id]; else S.checks[viewDay][h.id]=true;
+          await save(); renderHabits(); renderMini(); renderHello();
+        });
+        el.appendChild(div);
+      });
+    });
+  }
+
+  function renderMini(){
+    document.getElementById('miniStat').textContent = dayCount(viewDay)+' von '+activeHabits().length+' an diesem Tag.';
+  }
+
+  var FLAME='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C12 2 5.5 9.2 5.5 14.2a6.5 6.5 0 0 0 13 0c0-1.9-.9-3.9-2-5.7-.5 1.2-1.2 2.1-2.1 2.6.3-2.6-.8-6-2.4-9.1z"/></svg>';
+  function renderMood(){
+    var el=document.getElementById('mood'); el.innerHTML='';
+    var m=(S.journal[viewDay]||{}).mood||0;
+    for(var i=1;i<=5;i++){
+      (function(v){
+        var b=document.createElement('button');
+        b.className=v<=m?'on':''; b.innerHTML=FLAME; b.title=MOODS[v-1];
+        b.setAttribute('aria-label',MOODS[v-1]);
+        b.addEventListener('click',async function(){
+          var j=journalOf(viewDay);
+          j.mood=(j.mood===v?0:v);
+          await save(); renderMood();
+        });
+        el.appendChild(b);
+      })(i);
+    }
+    var lab=document.createElement('span'); lab.className='mlab';
+    lab.textContent=m?MOODS[m-1]:'';
+    el.appendChild(lab);
+  }
+
+  function bindJournal(){
+    var jd=document.getElementById('jDone'), jf=document.getElementById('jFeel'), t=null;
+    var j=S.journal[viewDay]||{};
+    jd.value=j.done||''; jf.value=j.feel||'';
+    function onIn(){
+      var o=journalOf(viewDay); o.done=jd.value; o.feel=jf.value;
+      if(jd.value.trim()&&jf.value.trim()) autoCheck('journal');
+      if(t) clearTimeout(t);
+      t=setTimeout(async function(){ await save(); flash('jSaved'); },400);
+    }
+    jd.oninput=onIn; jf.oninput=onIn;
+    jd.onblur=jf.onblur=function(){ var o=journalOf(viewDay); o.done=jd.value; o.feel=jf.value; save(); };
+  }
+
+  function flash(id){ var el=document.getElementById(id); if(!el) return; el.textContent='Gespeichert'; setTimeout(function(){el.textContent='';},1400); }
+
+  function renderToday(){
+    renderDayHead(); renderHello(); renderQuote(); renderRestNote(); renderHabits(); renderMini(); renderMood(); bindJournal();
+  }
+  document.getElementById('dayPrev').addEventListener('click',function(){
+    var a=daysAgo(viewDay); if(a>=MAXBACK) return; viewDay=dstr(dateMinus(a+1)); renderToday();
+  });
+  document.getElementById('dayNext').addEventListener('click',function(){
+    var a=daysAgo(viewDay); if(a<=0) return; viewDay=dstr(dateMinus(a-1)); renderToday();
+  });
+
+  /* ============================== DER WEG (Leitfaden) ============================== */
+  function renderPlan(){
+    var m=document.getElementById('routineMorning'), e=document.getElementById('routineEvening');
+    m.innerHTML=S.routine.morning.map(function(s){return '<li>'+esc(s)+'</li>';}).join('');
+    e.innerHTML=S.routine.evening.map(function(s){return '<li>'+esc(s)+'</li>';}).join('');
+    var card=document.getElementById('restdayCard');
+    if(S.restday<0){ card.style.display='none'; }
+    else{ card.style.display=''; document.getElementById('restdayName').textContent=WD[S.restday]; }
+  }
+
+  /* ============================== DAS BUCH ============================== */
+  function renderBuch(){
+    var feed=document.getElementById('buchFeed');
+    var q=buchQuery.toLowerCase();
+    var days=Object.keys(S.journal).filter(function(ds){
+      var j=S.journal[ds];
+      var has=(j.line&&j.line.trim())||(j.done&&j.done.trim())||(j.feel&&j.feel.trim())||j.mood;
+      if(!has) return false;
+      if(!q) return true;
+      return ((j.line||'')+' '+(j.done||'')+' '+(j.feel||'')).toLowerCase().indexOf(q)>=0;
+    }).sort().reverse().slice(0,90);
+
+    document.getElementById('buchCount').textContent = days.length? days.length+' Einträge':'';
+
+    if(!days.length){
+      feed.innerHTML='<p class="empty">'+(q?'Nichts gefunden — andere Worte probieren.':'Noch leer. Deine erste Zeile wartet auf dem „Heute"-Tab — unter dem Zitat.')+'</p>';
+    } else {
+      feed.innerHTML=days.map(function(ds){
+        var j=S.journal[ds], h='';
+        h+='<div class="entry"><div class="ed"><span>'+esc(fmtLong(ds))+'</span>';
+        if(j.mood){ h+='<span class="fl">'; for(var i=0;i<j.mood;i++) h+=FLAME; h+='</span>'; }
+        h+='</div>';
+        if(j.line&&j.line.trim()) h+='<p class="eline">„'+esc(j.line.trim())+'"</p>';
+        if(j.done&&j.done.trim()) h+='<p class="etxt"><span class="etag">Gemacht</span>'+esc(j.done.trim())+'</p>';
+        if(j.feel&&j.feel.trim()) h+='<p class="etxt"><span class="etag">Ehrlich</span>'+esc(j.feel.trim())+'</p>';
+        return h+'</div>';
+      }).join('');
+    }
+
+    /* Zitate-Liste */
+    var list=document.getElementById('qList');
+    var qs=S.quotes.slice();
+    if(qfilter==='fav') qs=qs.filter(function(x){return x.fav;});
+    if(qfilter==='eigene') qs=qs.filter(function(x){return x.own;});
+    if(!qs.length){
+      list.innerHTML='<p class="empty">'+(qfilter==='fav'?'Noch keine Favoriten — tippe ♡ bei einem Zitat, das dich trifft.':'Noch keine eigenen Zeilen aufgenommen.')+'</p>';
+    } else {
+      list.innerHTML=qs.map(function(x){
+        return '<div class="qrow" data-qid="'+esc(x.id)+'">'+
+          '<div class="qt"><p>'+esc(x.t)+'</p><span>— '+esc(x.a||'Unbekannt')+(x.own?' <i>· deins</i>':'')+'</span></div>'+
+          '<button class="ib'+(x.fav?' on':'')+'" data-act="fav" title="Favorit">'+(x.fav?'★':'☆')+'</button>'+
+          (x.own?'<button class="ib" data-act="del" title="Löschen">✕</button>':'')+
+        '</div>';
+      }).join('');
+    }
+    list.onclick=async function(ev){
+      var b=ev.target.closest('button[data-act]'); if(!b) return;
+      var row=ev.target.closest('[data-qid]'); if(!row) return;
+      var id=row.getAttribute('data-qid'), idx=-1;
+      for(var i=0;i<S.quotes.length;i++){ if(S.quotes[i].id===id){ idx=i; break; } }
+      if(idx<0) return;
+      if(b.getAttribute('data-act')==='fav'){ S.quotes[idx].fav=!S.quotes[idx].fav; }
+      else if(b.getAttribute('data-act')==='del'){
+        if(!confirm('Diese Zeile aus der Sammlung löschen?')) return;
+        S.quotes.splice(idx,1);
+      }
+      await save(); renderBuch();
+    };
+  }
+  document.getElementById('buchSearch').addEventListener('input',function(){ buchQuery=this.value; renderBuch(); });
+  document.getElementById('qFilter').addEventListener('click',function(ev){
+    var b=ev.target.closest('button[data-f]'); if(!b) return;
+    qfilter=b.getAttribute('data-f');
+    this.querySelectorAll('.pill').forEach(function(p){ p.classList.toggle('on',p===b); });
+    renderBuch();
+  });
+  document.getElementById('addQuoteBtn').addEventListener('click',async function(){
+    var t=document.getElementById('newQuoteText'), a=document.getElementById('newQuoteAuthor');
+    var txt=t.value.trim(); if(!txt) return;
+    S.quotes.unshift({id:genId('uq'),t:txt,a:a.value.trim()||'Du selbst',own:true,fav:false});
+    t.value=''; a.value='';
+    await save(); renderBuch();
+  });
+
+  /* ============================== FORTSCHRITT ============================== */
+  function renderStats(){
+    var el=document.getElementById('stats');
+    var tiles=[
+      {big:dayCount(today())+'/'+activeHabits().length, lab:'Heute'},
+      {big:daysActiveRange(0,7), lab:'Letzte 7 Tage'},
+      {big:daysThisMonth(), lab:'Diesen Monat'},
+      {big:totalDays(), lab:'Tage gesamt dabei'}
+    ];
+    el.innerHTML=tiles.map(function(t){return '<div class="stat"><div class="big">'+t.big+'</div><div class="lab">'+t.lab+'</div></div>';}).join('');
+  }
+
+  function bestWeekday(){
+    var sum=[0,0,0,0,0,0,0], cnt=[0,0,0,0,0,0,0];
+    Object.keys(S.checks).forEach(function(k){
+      var d=parseD(k).getDay(); sum[d]+=dayCount(k); cnt[d]+=1;
+    });
+    var best=-1,bestAvg=-1;
+    for(var i=0;i<7;i++){ if(cnt[i]>=2){ var avg=sum[i]/cnt[i]; if(avg>bestAvg){ bestAvg=avg; best=i; } } }
+    return best;
+  }
+
+  function moodInsight(){
+    /* Gibt es eine Gewohnheit, an deren Tagen die Tagesbewertung klar höher liegt? */
+    var bestH=null,bestDiff=0,bestA=0,bestB=0;
+    activeHabits().forEach(function(h){
+      var w=[],wo=[];
+      for(var i=0;i<30;i++){
+        var ds=dstr(dateMinus(i)), j=S.journal[ds];
+        if(!j||!j.mood) continue;
+        ((S.checks[ds]&&S.checks[ds][h.id])?w:wo).push(j.mood);
+      }
+      if(w.length>=4&&wo.length>=4){
+        var a=w.reduce(function(x,y){return x+y;},0)/w.length;
+        var b=wo.reduce(function(x,y){return x+y;},0)/wo.length;
+        if(a-b>bestDiff){ bestDiff=a-b; bestH=h; bestA=a; bestB=b; }
+      }
+    });
+    if(bestH&&bestDiff>=0.6){
+      return 'An Tagen mit <b>'+esc(bestH.label)+'</b> bewertest du deinen Tag im Schnitt mit '+deNum(bestA)+' statt '+deNum(bestB)+' Flammen. Dein Körper stimmt mit ab — hör auf ihn.';
+    }
+    return null;
+  }
+
+  function lastChangeDaysAgo(){
+    var last=null;
+    S.changelog.forEach(function(e){ if(!last||e.d>last) last=e.d; });
+    if(!last) last=S.createdAt||today();
+    return daysAgo(last)<0?0:daysAgo(last);
+  }
+
+  function renderInsights(){
+    var el=document.getElementById('insights'), out=[], n=totalDays();
+    if(n<3){
+      out.push('Noch frische Daten — hak ein paar Tage ab, dann lese ich hier Muster für dich raus. Erstmal zählt nur: anfangen.');
+    } else {
+      var strong=null,strongC=-1,weak=null,weakC=999;
+      activeHabits().forEach(function(h){ var c=habitCount(h.id,30); if(c>strongC){strongC=c;strong=h;} if(c<weakC){weakC=c;weak=h;} });
+      if(strong&&strongC>0){ out.push('Dein Anker ist gerade <b>'+esc(strong.label)+'</b> — '+strongC+'× in den letzten 30 Tagen. Darauf kannst du bauen.'); }
+      var tw=daysActiveRange(0,7), lw=daysActiveRange(7,14);
+      if(tw>=lw){ out.push('Diese Woche warst du an <b>'+tw+'</b> Tagen dabei'+(n>7?' (letzte Woche '+lw+')':'')+'. '+(tw>lw?'Tendenz nach oben.':'Konstant.')); }
+      else { out.push('Diese Woche bisher <b>'+tw+'</b> Tage (letzte '+lw+'). Auch ruhigere Wochen gehören dazu — heute zählt der nächste Haken, nicht die letzte Woche.'); }
+      var mi=moodInsight(); if(mi) out.push(mi);
+      var bw=bestWeekday();
+      if(bw>=0){ out.push('<b>'+WD[bw]+'e</b> sind oft deine stärksten Tage.'); }
+      if(weak&&strong&&weak.id!==strong.id&&weakC<strongC){ out.push('Am kürzesten kommt <b>'+esc(weak.label)+'</b>. Wenn du diese Woche bewusst einen Punkt rauspickst — vielleicht der. Ganz ohne Druck.'); }
+      var lines=0; for(var i=0;i<7;i++){ var j=S.journal[dstr(dateMinus(i))]; if(j&&((j.feel&&j.feel.trim())||(j.line&&j.line.trim()))) lines++; }
+      if(lines>=3){ out.push('Du hast diese Woche <b>'+lines+'</b> ehrliche Zeilen geschrieben. Das ist Regel II in Aktion.'); }
+      var gap=false; for(var g=2;g<7;g++){ if(dayCount(dstr(dateMinus(g)))===0) gap=true; }
+      if(gap&&dayCount(today())>=1){ out.push('Du warst zwischendrin kurz raus und bist wieder da — <b>genau das</b> ist die ganze Kunst.'); }
+      if(n>=10&&lastChangeDaysAgo()>21){ out.push('Deine Routine ist seit über <b>drei Wochen unverändert</b>. Passt sie noch zu deinem Alltag? Nimm dir im Wochen-Review EINE Stellschraube vor — Werkzeuge schärft man nach.'); }
+    }
+    el.innerHTML=out.slice(0,6).map(function(t){return '<div class="insight"><span class="dot2"></span><div>'+t+'</div></div>';}).join('');
+  }
+
+  function renderBars(){
+    var el=document.getElementById('bars'); var maxd=Math.min(30,Math.max(1,totalDays()+2));
+    el.innerHTML=activeHabits().map(function(h){
+      var c=habitCount(h.id,30); var pct=Math.round((c/maxd)*100); if(pct>100)pct=100;
+      return '<div class="bar-row"><div class="bl"><span>'+esc(h.label)+'</span><b>'+c+'×</b></div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div></div>';
+    }).join('');
+  }
+
+  function renderHeat(){
+    var el=document.getElementById('heat'); el.innerHTML='';
+    for(var i=55;i>=0;i--){
+      var ds=dstr(dateMinus(i)), lv=level(dayCount(ds));
+      var c=document.createElement('div');
+      c.className='cell'+(lv?(' l'+lv):'')+(i===0?' now':'');
+      c.title=fmtShort(ds)+' — '+dayCount(ds)+'/'+activeHabits().length;
+      el.appendChild(c);
+    }
+  }
+
+  var reflTimer=null;
+  function renderReflect(){
+    var ta=document.getElementById('reflect'), sv=document.getElementById('reflectSaved');
+    var wk=isoWeek(new Date());
+    ta.value=S.reflections[wk]||'';
+    ta.oninput=function(){
+      S.reflections[wk]=ta.value;
+      if(reflTimer) clearTimeout(reflTimer);
+      reflTimer=setTimeout(async function(){ await save(); sv.textContent='Gespeichert'; setTimeout(function(){sv.textContent='';},1400); },500);
+    };
+    ta.onblur=function(){ S.reflections[wk]=ta.value; save(); };
+    var prev=S.reflections[prevIsoWeek()];
+    document.getElementById('prevReflect').innerHTML = (prev&&prev.trim())
+      ? '<p class="prevref">Letzte Woche schriebst du: „'+esc(prev.trim())+'"</p>' : '';
+  }
+
+  function renderProgress(){ renderStats(); renderInsights(); renderBars(); renderReflect(); renderHeat(); }
+
+  /* ============================== ANPASSEN ============================== */
+  function moveHabit(id,dir){
+    var i=-1; S.habits.forEach(function(h,k){ if(h.id===id) i=k; });
+    if(i<0) return;
+    var g=S.habits[i].g, j=i+dir;
+    while(j>=0&&j<S.habits.length&&S.habits[j].g!==g) j+=dir;
+    if(j<0||j>=S.habits.length) return;
+    var tmp=S.habits[i]; S.habits[i]=S.habits[j]; S.habits[j]=tmp;
+  }
+
+  function renderHabitEditor(){
+    var el=document.getElementById('habitEditor'); el.innerHTML='';
+    GROUPS.forEach(function(g){
+      var inG=S.habits.filter(function(h){return h.g===g;});
+      if(!inG.length) return;
+      var gh=document.createElement('p'); gh.className='hgroup'; gh.textContent=g; el.appendChild(gh);
+      inG.forEach(function(h){
+        var row=document.createElement('div'); row.className='erow'+(h.off?' off':'');
+        row.innerHTML=
+          '<button class="ib" data-a="up" title="Hoch">↑</button>'+
+          '<button class="ib" data-a="down" title="Runter">↓</button>'+
+          '<input type="text" value="'+esc(h.label)+'" aria-label="Name">'+
+          '<select aria-label="Gruppe">'+GROUPS.map(function(x){return '<option'+(x===h.g?' selected':'')+'>'+x+'</option>';}).join('')+'</select>'+
+          '<label class="cb"><input type="checkbox"'+(h.rest?' checked':'')+'> Restday frei</label>'+
+          '<button class="ib" data-a="pause" title="'+(h.off?'Wieder aktivieren':'Pausieren')+'">'+(h.off?'▶':'⏸')+'</button>'+
+          '<button class="ib" data-a="del" title="Löschen">✕</button>';
+        var inp=row.querySelector('input[type=text]');
+        inp.addEventListener('change',async function(){
+          var v=inp.value.trim(); if(!v){ inp.value=h.label; return; }
+          if(v!==h.label){ h.label=v; logChange('Gewohnheit angepasst: „'+v+'"'); await save(); renderChangelog(); }
+        });
+        row.querySelector('select').addEventListener('change',async function(){
+          h.g=this.value; logChange('Gewohnheit verschoben: „'+h.label+'" → '+h.g);
+          await save(); renderHabitEditor(); renderChangelog();
+        });
+        row.querySelector('label.cb input').addEventListener('change',async function(){
+          h.rest=this.checked; await save();
+        });
+        row.addEventListener('click',async function(ev){
+          var b=ev.target.closest('button[data-a]'); if(!b) return;
+          var a=b.getAttribute('data-a');
+          if(a==='up'||a==='down'){ moveHabit(h.id,a==='up'?-1:1); }
+          else if(a==='pause'){
+            h.off=!h.off;
+            logChange((h.off?'Gewohnheit pausiert: „':'Gewohnheit wieder aktiv: „')+h.label+'"');
+          }
+          else if(a==='del'){
+            if(!confirm('„'+h.label+'" wirklich entfernen? Die alten Tage bleiben gezählt.')) return;
+            S.habits=S.habits.filter(function(x){return x.id!==h.id;});
+            logChange('Gewohnheit entfernt: „'+h.label+'"');
+          }
+          await save(); renderHabitEditor(); renderChangelog();
+        });
+        el.appendChild(row);
+      });
+    });
+  }
+  document.getElementById('addHabitBtn').addEventListener('click',async function(){
+    var inp=document.getElementById('newHabitLabel'), sel=document.getElementById('newHabitGroup');
+    var v=inp.value.trim(); if(!v) return;
+    S.habits.push({id:genId('h'),g:sel.value,label:v,rest:false});
+    logChange('Gewohnheit hinzugefügt: „'+v+'"');
+    inp.value='';
+    await save(); renderHabitEditor(); renderChangelog();
+  });
+
+  function renderRoutineEditor(){
+    [['M','morning'],['E','evening']].forEach(function(pair){
+      var suf=pair[0], key=pair[1];
+      var el=document.getElementById('routineEdit'+suf); el.innerHTML='';
+      S.routine[key].forEach(function(step,i){
+        var row=document.createElement('div'); row.className='erow';
+        row.innerHTML='<button class="ib" data-a="up">↑</button><button class="ib" data-a="down">↓</button>'+
+          '<input type="text" value="'+esc(step)+'"><button class="ib" data-a="del" title="Löschen">✕</button>';
+        row.querySelector('input').addEventListener('change',async function(){
+          var v=this.value.trim(); if(!v){ this.value=step; return; }
+          S.routine[key][i]=v;
+          logChange(suf==='M'?'Morgenroutine angepasst':'Abendroutine angepasst');
+          await save(); renderChangelog();
+        });
+        row.addEventListener('click',async function(ev){
+          var b=ev.target.closest('button[data-a]'); if(!b) return;
+          var a=b.getAttribute('data-a');
+          if(a==='del'){ S.routine[key].splice(i,1); }
+          else { var j=i+(a==='up'?-1:1); if(j<0||j>=S.routine[key].length) return;
+                 var t=S.routine[key][i]; S.routine[key][i]=S.routine[key][j]; S.routine[key][j]=t; }
+          logChange(suf==='M'?'Morgenroutine angepasst':'Abendroutine angepasst');
+          await save(); renderRoutineEditor(); renderChangelog();
+        });
+        el.appendChild(row);
+      });
+    });
+  }
+  [['addStepM','newStepM','morning','Morgenroutine angepasst'],['addStepE','newStepE','evening','Abendroutine angepasst']].forEach(function(c){
+    document.getElementById(c[0]).addEventListener('click',async function(){
+      var inp=document.getElementById(c[1]); var v=inp.value.trim(); if(!v) return;
+      S.routine[c[2]].push(v); inp.value='';
+      logChange(c[3]);
+      await save(); renderRoutineEditor(); renderChangelog();
+    });
+  });
+
+  function renderSettings(){
+    var nm=document.getElementById('setName'), rd=document.getElementById('setRestday');
+    nm.value=S.name; rd.value=String(S.restday);
+    nm.onchange=async function(){ var v=nm.value.trim(); if(!v){ nm.value=S.name; return; } S.name=v; await save(); };
+    rd.onchange=async function(){
+      S.restday=parseInt(rd.value,10);
+      logChange('Restday geändert: '+(S.restday<0?'keiner':WD[S.restday]));
+      await save(); renderPlan(); renderChangelog();
+    };
+  }
+
+  function renderChangelog(){
+    var el=document.getElementById('changelog');
+    var log=S.changelog.slice(-14).reverse();
+    el.innerHTML = log.length
+      ? log.map(function(e){return '<div class="logrow"><span class="ld">'+esc(fmtShort(e.d))+'</span><span>'+esc(e.t)+'</span></div>';}).join('')
+      : '<p class="empty">Noch keine Änderungen — deine Version 1 läuft.</p>';
+  }
+
+  /* Daten: Export / Import / Reset */
+  document.getElementById('exportBtn').addEventListener('click',function(){
+    var blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='derweg-backup-'+today()+'.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200);
+  });
+  document.getElementById('importBtn').addEventListener('click',function(){ document.getElementById('importFile').click(); });
+  document.getElementById('importFile').addEventListener('change',function(){
+    var f=this.files&&this.files[0]; this.value=''; if(!f) return;
+    var rd=new FileReader();
+    rd.onload=async function(){
+      try{
+        var parsed=JSON.parse(rd.result);
+        if(!parsed||typeof parsed!=='object'||!Array.isArray(parsed.habits)) throw new Error('bad');
+        if(!confirm('Backup einlesen? Der aktuelle Stand in diesem Browser wird ersetzt.')) return;
+        S=fix(parsed);
+        logChange('Backup eingelesen');
+        await save(); renderAll();
+        alert('Backup übernommen.');
+      }catch(e){ alert('Das sieht nicht wie ein gültiges Backup aus.'); }
+    };
+    rd.readAsText(f);
+  });
+  document.getElementById('resetBtn').addEventListener('click',async function(){
+    if(!confirm('Wirklich ALLES zurücksetzen? Haken, Buch, Zitate, Routine — alles weg.')) return;
+    if(!confirm('Letzte Sicherheitsfrage: Es gibt kein Zurück (außer du hast ein Backup).')) return;
+    S=defaultState();
+    await save(); viewDay=today(); renderAll();
+  });
+
+  function renderEdit(){ renderHabitEditor(); renderRoutineEditor(); renderSettings(); renderChangelog(); }
+
+  /* ============================== Start ============================== */
+  function renderAll(){ renderToday(); renderPlan(); renderBuch(); renderProgress(); renderEdit(); }
+
+  function init(){ load().then(function(){ renderAll(); }); }
+  if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body>
+</html>
