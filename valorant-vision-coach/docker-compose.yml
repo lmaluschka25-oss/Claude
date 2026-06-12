@@ -1,0 +1,36 @@
+# Valorant Vision Coach — full local stack.
+#   docker compose up --build
+# Then open http://localhost:5173 (dashboard) and http://localhost:8000/docs (API).
+#
+# Real inference: set VVC_DETECTOR_BACKEND=yolo and VVC_OCR_BACKEND=easyocr,
+# rebuild the backend with ML deps, and drop weights in backend/data/models/.
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        # Set to "true" to bake YOLO + OCR into the image.
+        INSTALL_ML: "${INSTALL_ML:-false}"
+    environment:
+      VVC_ENVIRONMENT: "${VVC_ENVIRONMENT:-development}"
+      VVC_DETECTOR_BACKEND: "${VVC_DETECTOR_BACKEND:-mock}"
+      VVC_OCR_BACKEND: "${VVC_OCR_BACKEND:-off}"
+      VVC_FRAME_SAMPLE_STRIDE: "${VVC_FRAME_SAMPLE_STRIDE:-6}"
+      VVC_CORS_ORIGINS: '["http://localhost:5173"]'
+    volumes:
+      - vvc-data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  vvc-data:

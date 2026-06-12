@@ -1,0 +1,8 @@
+# Optional heavy ML dependencies for real detection + OCR.
+# Install when you have trained weights and want real inference:
+#   pip install -r requirements-ml.txt
+# Without these, the app falls back to the mock detector and OCR is disabled.
+ultralytics==8.3.55
+easyocr==1.7.2
+# torch is pulled in by ultralytics/easyocr; pin explicitly if you need a
+# specific CUDA build (see https://pytorch.org/get-started/locally/).
