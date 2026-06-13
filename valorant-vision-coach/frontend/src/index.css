@@ -532,3 +532,98 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Prediction card (single output) ---- */
+.predict-hero {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.predict-top {
+  text-align: center;
+  min-width: 140px;
+}
+.predict-top-site {
+  font-size: 76px;
+  font-weight: 800;
+  line-height: 1;
+}
+.predict-top-pct {
+  font-size: 30px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.predict-map {
+  width: 190px;
+  height: 190px;
+  flex-shrink: 0;
+}
+.predict-bars {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.predict-bar-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 48px;
+  gap: 10px;
+  align-items: center;
+}
+.predict-bar-site {
+  font-weight: 700;
+}
+.predict-bar-pct {
+  text-align: right;
+}
+.predict-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 18px;
+}
+.predict-meta > div:first-child {
+  flex: 1;
+}
+.predict-reason {
+  margin-top: 14px;
+  font-size: 14px;
+}
+.predict-factors {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.predict-factor {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.pf-head {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.predict-seq {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.seq-chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 0 5px;
+}

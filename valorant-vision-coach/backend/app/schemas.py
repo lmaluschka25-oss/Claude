@@ -148,6 +148,37 @@ class TendencyReport(BaseModel):
     agent_site_preference: list[AgentSitePreference]
 
 
+# ---- Next-round prediction (smart scouting model) -----------------------
+class SitePrediction(BaseModel):
+    site: str
+    probability: float = Field(description="Predicted commitment probability in [0, 1].")
+
+
+class PredictionFactor(BaseModel):
+    label: str
+    detail: str
+    weight: float = Field(description="Relative influence of this factor in [0, 1].")
+
+
+class NextRoundPrediction(BaseModel):
+    """Predicted enemy site commitment for the next round.
+
+    A *post-match* scouting prediction built from observed round-by-round
+    commitments (map as the primary source). It is study/preparation material,
+    not a live in-match overlay.
+    """
+
+    match_id: int
+    map_name: str | None
+    rounds_analyzed: int
+    predicted_sites: list[SitePrediction]
+    confidence: float = Field(description="Overall confidence in [0, 1].")
+    top_factor: str | None
+    factors: list[PredictionFactor]
+    last_committed_site: str | None
+    per_round_commitment: list[str]
+
+
 # ---- Maps ----------------------------------------------------------------
 class CalloutOut(BaseModel):
     id: str

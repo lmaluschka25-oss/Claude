@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from app.analysis.last_known_position import to_last_known
 from app.analysis.rotation import estimate_rotations
+from app.analysis.prediction import predict_next_round
 from app.analysis.site_pressure import estimate_site_pressure
 from app.analysis.tendencies import build_tendencies
 from app.analysis.tracks import build_enemy_tracks
@@ -103,3 +104,29 @@ def test_tendencies_site_frequency_and_agent_preference():
     assert freq["A"].rounds == 1
     jett = next(a for a in rep.agent_site_preference if a.agent_name == "Jett")
     assert jett.rounds_seen == 2  # seen in rounds 1 (B) and 3 (A)
+
+
+@dataclass
+class R:
+    id: int
+    round_number: int
+
+
+def test_prediction_next_round():
+    game_map = load_map("ascent")
+    rounds = [R(1, 1), R(2, 2), R(3, 3), R(4, 4)]
+    dets = [
+        D(1.0, 0.80, 0.24, agent_name="Killjoy", round_id=1),
+        D(2.0, 0.80, 0.24, agent_name="Jett", round_id=1),
+        D(31.0, 0.80, 0.24, agent_name="Killjoy", round_id=2),
+        D(61.0, 0.20, 0.22, agent_name="Jett", round_id=3),
+        D(91.0, 0.80, 0.24, agent_name="Killjoy", round_id=4),
+    ]
+    pred = predict_next_round(dets, rounds, 1, "ascent", game_map, SETTINGS)
+    assert pred.rounds_analyzed == 4
+    assert pred.per_round_commitment == ["B", "B", "A", "B"]
+    assert pred.predicted_sites[0].site == "B"  # base + momentum favour B
+    assert abs(sum(s.probability for s in pred.predicted_sites) - 1.0) < 1e-2
+    assert 0.0 < pred.confidence <= 1.0
+    assert pred.last_committed_site == "B"
+    assert pred.top_factor

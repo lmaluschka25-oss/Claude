@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ...analysis.engine import build_snapshot
 from ...analysis.last_known_position import to_last_known
+from ...analysis.prediction import predict_next_round
 from ...analysis.rotation import estimate_rotations
 from ...analysis.site_pressure import estimate_site_pressure
 from ...analysis.tendencies import build_tendencies
@@ -15,6 +16,7 @@ from ...schemas import (
     AnalysisSnapshot,
     EnemyRotation,
     LastKnownPosition,
+    NextRoundPrediction,
     SitePressure,
     TendencyReport,
 )
@@ -119,6 +121,21 @@ def tendencies(
     match = _require_match(session, match_id)
     detections = match_service.get_detections(session, match_id)
     return build_tendencies(detections, match_id, match.map_name, load_map(match.map_name))
+
+
+@router.get("/prediction", response_model=NextRoundPrediction)
+def prediction(
+    match_id: int,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+) -> NextRoundPrediction:
+    """Smart next-round site-commitment prediction (post-match scouting)."""
+    match = _require_match(session, match_id)
+    detections = match_service.get_detections(session, match_id)
+    rounds = match_service.get_rounds(session, match_id)
+    return predict_next_round(
+        detections, rounds, match_id, match.map_name, load_map(match.map_name), settings
+    )
 
 
 def _require_match(session: Session, match_id: int):

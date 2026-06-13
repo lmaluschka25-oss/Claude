@@ -1,13 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client.js";
 import MatchUpload from "./components/MatchUpload.jsx";
 import MatchList from "./components/MatchList.jsx";
-import MapView from "./components/MapView.jsx";
-import Timeline from "./components/Timeline.jsx";
-import LastKnownPanel from "./components/LastKnownPanel.jsx";
-import RotationPanel from "./components/RotationPanel.jsx";
-import SitePressurePanel from "./components/SitePressurePanel.jsx";
-import TendenciesPanel from "./components/TendenciesPanel.jsx";
+import PredictionCard from "./components/PredictionCard.jsx";
 
 export default function App() {
   const [info, setInfo] = useState(null);
@@ -16,17 +11,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [mapMeta, setMapMeta] = useState(null);
-  const [snapshot, setSnapshot] = useState(null);
-  const [tendencies, setTendencies] = useState(null);
-  const [at, setAt] = useState(0);
-  const [ttl, setTtl] = useState(12);
-  const [playing, setPlaying] = useState(false);
+  const [prediction, setPrediction] = useState(null);
   const [error, setError] = useState(null);
-
-  const atRef = useRef(at);
-  const ttlRef = useRef(ttl);
-  atRef.current = at;
-  ttlRef.current = ttl;
 
   const loadMatches = useCallback(async () => {
     try {
@@ -36,7 +22,6 @@ export default function App() {
     }
   }, []);
 
-  // Initial load.
   useEffect(() => {
     api.systemInfo().then(setInfo).catch((e) => setError(e.message));
     api.listMaps().then(setMaps).catch(() => {});
@@ -55,9 +40,7 @@ export default function App() {
     try {
       const d = await api.getMatch(id);
       setDetail(d);
-      setAt(d.duration_seconds || 0);
-      setPlaying(false);
-      api.getTendencies(id).then(setTendencies).catch(() => setTendencies(null));
+      api.getPrediction(id).then(setPrediction).catch(() => setPrediction(null));
       if (d.map_name) {
         api.getMap(d.map_name).then(setMapMeta).catch(() => setMapMeta(null));
       } else {
@@ -68,7 +51,7 @@ export default function App() {
     }
   }, []);
 
-  // When a selected match finishes processing, load its full detail.
+  // Load the prediction once a selected match finishes processing.
   useEffect(() => {
     if (!selectedId) return;
     const summary = matches.find((m) => m.id === selectedId);
@@ -77,53 +60,25 @@ export default function App() {
     }
   }, [matches, selectedId, detail, loadDetail]);
 
-  // Throttled snapshot refresh: re-fetch only when at/ttl actually changed.
-  useEffect(() => {
-    if (!detail || detail.status !== "completed") {
-      setSnapshot(null);
-      return;
-    }
-    let cancelled = false;
-    let lastKey = null;
-    const fetchSnap = async () => {
-      const key = `${atRef.current.toFixed(2)}|${ttlRef.current}`;
-      if (key === lastKey) return;
-      lastKey = key;
-      try {
-        const snap = await api.getSnapshot(detail.id, atRef.current, ttlRef.current);
-        if (!cancelled) setSnapshot(snap);
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      }
-    };
-    fetchSnap();
-    const id = setInterval(fetchSnap, 200);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [detail]);
-
   function handleSelect(m) {
     setSelectedId(m.id);
-    setSnapshot(null);
+    setPrediction(null);
     if (m.status === "completed") {
       loadDetail(m.id);
     } else {
       setDetail(null);
       setMapMeta(null);
-      setTendencies(null);
     }
   }
 
   async function handleDelete(m) {
-    if (!confirm(`Delete "${m.filename}" and its analysis?`)) return;
+    if (!confirm(`"${m.filename}" und die Auswertung löschen?`)) return;
     try {
       await api.deleteMatch(m.id);
       if (selectedId === m.id) {
         setSelectedId(null);
         setDetail(null);
-        setSnapshot(null);
+        setPrediction(null);
       }
       loadMatches();
     } catch (e) {
@@ -140,7 +95,7 @@ export default function App() {
           <div className="logo">VC</div>
           <div>
             <h1>Valorant Vision Coach</h1>
-            <small>Post-match analysis · on-screen vision only</small>
+            <small>Site-Vorhersage · Scouting aus Aufnahmen</small>
           </div>
         </div>
         <div className="header-meta">
@@ -149,10 +104,6 @@ export default function App() {
               <span>
                 <span className={`dot ${info.detector_ready ? "ok" : "off"}`} />
                 detector: {info.detector_backend}
-              </span>
-              <span>
-                <span className={`dot ${info.ocr_ready ? "ok" : "off"}`} />
-                ocr: {info.ocr_backend}
               </span>
               <span>v{info.version}</span>
             </>
@@ -170,8 +121,8 @@ export default function App() {
             onDelete={handleDelete}
           />
           <div className="notice">
-            Reads only what was on your screen — viewport, minimap, killfeed,
-            scoreboard, timer. No memory reads, no packets, no hidden info.
+            Reine Post-Match-Analyse aus deinen Aufnahmen. Keine Live-Daten, kein
+            Speicher-Zugriff, keine versteckten Infos.
           </div>
         </aside>
 
@@ -181,7 +132,8 @@ export default function App() {
           {!selectedId && (
             <div className="panel">
               <div className="panel-body empty">
-                Upload a recorded match and select it to open the tactical dashboard.
+                Nimm eine Runde auf (oder lade eine Aufnahme hoch) und wähle sie
+                aus — dann erscheint hier die Site-Vorhersage für die nächste Runde.
               </div>
             </div>
           )}
@@ -190,56 +142,13 @@ export default function App() {
             <div className="panel">
               <div className="panel-body empty">
                 {detail?.status === "failed"
-                  ? `Processing failed: ${detail.status_detail || "unknown error"}`
-                  : "Processing… the dashboard opens automatically when analysis is ready."}
+                  ? `Auswertung fehlgeschlagen: ${detail.status_detail || "unbekannter Fehler"}`
+                  : "Wird ausgewertet … die Vorhersage erscheint automatisch, sobald es fertig ist."}
               </div>
             </div>
           )}
 
-          {ready && (
-            <>
-              <Timeline
-                duration={detail.duration_seconds || 0}
-                at={at}
-                onScrub={setAt}
-                playing={playing}
-                setPlaying={setPlaying}
-                ttl={ttl}
-                onTtl={setTtl}
-              />
-              <div className="grid-2">
-                <div className="panel">
-                  <div className="panel-header">
-                    <h2>{mapMeta?.display_name || detail.map_name || "Map"}</h2>
-                    <span className="faint">{detail.detections_count} detections</span>
-                  </div>
-                  <div className="panel-body">
-                    <MapView mapMeta={mapMeta} snapshot={snapshot} />
-                    <div className="legend">
-                      <span>
-                        <span className="swatch" style={{ background: "#ff4655" }} />
-                        last known enemy
-                      </span>
-                      <span>
-                        <span className="swatch" style={{ background: "#ffb454" }} />
-                        likely rotation
-                      </span>
-                      <span>
-                        <span className="swatch" style={{ background: "#19c3a6" }} />
-                        site pressure
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <LastKnownPanel lastKnown={snapshot?.last_known || []} />
-                  <SitePressurePanel sitePressure={snapshot?.site_pressure || []} />
-                  <TendenciesPanel report={tendencies} />
-                </div>
-              </div>
-              <RotationPanel rotations={snapshot?.rotations || []} />
-            </>
-          )}
+          {ready && <PredictionCard prediction={prediction} mapMeta={mapMeta} />}
         </main>
       </div>
     </div>
