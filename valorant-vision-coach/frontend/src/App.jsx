@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client.js";
+import { cx } from "./util.js";
 import TopNav from "./components/TopNav.jsx";
 import MatchSidebar from "./components/MatchSidebar.jsx";
 import EnlargedMinimap from "./components/EnlargedMinimap.jsx";
@@ -98,6 +99,7 @@ export default function App() {
   return (
     <div className="app">
       <TopNav tab={tab} onTab={setTab} info={info} />
+      <main className={cx("content", tab === "ANALYSIS" && "fit")}>
       {error && (
         <div className="error-banner top">{error}<button onClick={() => setError(null)}>✕</button></div>
       )}
@@ -148,6 +150,7 @@ export default function App() {
           )}
         </div>
       )}
+      </main>
 
       <footer className="appfoot">
         <span>Match Analyzer v{info?.version || "1.0.0"}</span>

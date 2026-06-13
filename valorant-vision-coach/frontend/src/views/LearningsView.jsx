@@ -1,15 +1,13 @@
 import Donut from "../components/Donut.jsx";
-import Heatmap from "../components/Heatmap.jsx";
 import {
   AnalysisLog,
-  EnemyProfiles,
   MatchMemory,
   PatternRecognition,
   PositionProbabilities,
 } from "../components/panels.jsx";
 import { pct } from "../util.js";
 
-export default function LearningsView({ intelligence, mapMeta }) {
+export default function LearningsView({ intelligence }) {
   if (!intelligence || (intelligence.match_memory?.rounds_analyzed || 0) === 0) {
     return (
       <div className="view">
@@ -63,19 +61,13 @@ export default function LearningsView({ intelligence, mapMeta }) {
                 <div className="bar"><span style={{ width: pct(p.site_share), background: "#4ade80" }} /></div>
                 <span className="mono small">{p.favored_site} {pct(p.site_share)}</span>
               </div>
-              <div className="muted small">
-                Seen {p.rounds_seen}× — most often near {p.favored_site}.
-              </div>
+              <div className="muted small">Seen {p.rounds_seen}× — most often near {p.favored_site}.</div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="grid-2">
-        <MatchMemory memory={mem} />
-        <Heatmap cells={intelligence.heatmap} mapMeta={mapMeta} />
-      </div>
-
+      <MatchMemory memory={mem} />
       <AnalysisLog steps={intelligence.analysis_log} />
     </div>
   );

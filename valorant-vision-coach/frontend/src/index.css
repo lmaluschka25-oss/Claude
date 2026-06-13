@@ -322,3 +322,25 @@ em { font-style: normal; color: var(--faint); }
 .agent-learn-head { display: flex; justify-content: space-between; align-items: baseline; }
 .agent-learn-bar { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
 .agent-learn-bar .bar { flex: 1; }
+
+/* ---- One-screen fit (ANALYSIS) ---- */
+.app { height: 100vh; }
+.content { flex: 1; min-height: 0; overflow: auto; }
+.content.fit { overflow: hidden; }
+.content.fit .analysis { height: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; }
+.content.fit .row-top { flex: 1; min-height: 0; align-items: stretch; }
+.content.fit .sidebar, .content.fit .right-col { min-height: 0; overflow: auto; }
+.content.fit .center-col { min-height: 0; }
+.content.fit .minimap-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.content.fit .minimap-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.content.fit .minimap-wrap { flex: 1; min-height: 0; aspect-ratio: auto; }
+.content.fit .hero { padding: 14px; }
+.content.fit .hero-site { font-size: 56px; }
+.content.fit .timeline-panel .panel-body { padding: 8px 12px; }
+.analysis-hint { display: none; }
+
+/* ---- New minimap text ---- */
+.mm-spawn { fill: #8b97a8; font-size: 13px; }
+.mm-you { fill: #ffd166; font-size: 16px; font-weight: 800; }
+.mm-count { fill: #fff; font-size: 22px; font-weight: 800; }
+.mm-empty { fill: var(--faint); font-size: 22px; }
