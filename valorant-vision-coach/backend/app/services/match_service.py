@@ -32,6 +32,20 @@ def create_match(
     return match
 
 
+def update_match(
+    session: Session, match: Match, *, name=None, map_name=None, side: Side | None = None
+) -> Match:
+    if name is not None:
+        match.name = name
+    if map_name is not None:
+        match.map_name = map_name.lower() or None
+    if side is not None:
+        match.side = side
+    session.commit()
+    session.refresh(match)
+    return match
+
+
 def delete_match(session: Session, match: Match) -> None:
     paths = [r.stored_path for r in match.rounds]
     session.delete(match)

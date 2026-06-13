@@ -61,10 +61,10 @@ class Settings(BaseSettings):
     # ---- Minimap calibration (color-based minimap detector) -------------
     # The minimap rectangle as fractions of the frame, plus per-side
     # rotation/flip. Tune these to your HUD with the /minimap-preview endpoint.
-    minimap_x_frac: float = 0.012
-    minimap_y_frac: float = 0.012
-    minimap_w_frac: float = 0.182
-    minimap_h_frac: float = 0.324
+    minimap_x_frac: float = 0.02
+    minimap_y_frac: float = 0.046
+    minimap_w_frac: float = 0.224
+    minimap_h_frac: float = 0.396
     minimap_rotation: int = 0
     minimap_flip_x: bool = False
     # Red enemy-marker color gate (HSV) and blob-area bounds (pixels).

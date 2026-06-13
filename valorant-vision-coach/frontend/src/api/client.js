@@ -32,6 +32,8 @@ export const api = {
   listMatches: () => req("/matches"),
   createMatch: (body) => req("/matches", jsonBody(body)),
   getMatch: (id) => req(`/matches/${id}`),
+  updateMatch: (id, body) =>
+    req(`/matches/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
   deleteMatch: (id) => req(`/matches/${id}`, { method: "DELETE" }),
   listRounds: (id) => req(`/matches/${id}/rounds`),
   getIntelligence: (id, roundId) =>

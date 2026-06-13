@@ -19,6 +19,12 @@ class MatchCreate(BaseModel):
     side: Side = Side.UNKNOWN
 
 
+class MatchUpdate(BaseModel):
+    name: str | None = None
+    map_name: str | None = None
+    side: Side | None = None
+
+
 class MatchSummary(ORMModel):
     id: int
     name: str
@@ -174,6 +180,8 @@ class DetectedPositionLive(BaseModel):
 
 class Recommendation(BaseModel):
     best_site: str | None
+    mode: str = "attack"  # "attack" (hit weakest) | "defense" (stack most-hit)
+    action_label: str = "Attack"  # verb shown in the hero ("Attack" / "Stack")
     success_probability: float
     confidence: float
     confidence_label: str

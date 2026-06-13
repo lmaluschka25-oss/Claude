@@ -19,6 +19,7 @@ from ...schemas import (
     MatchDetail,
     MatchIntelligence,
     MatchSummary,
+    MatchUpdate,
     RoundOut,
 )
 from ...services import match_service, pipeline
@@ -53,6 +54,17 @@ def create_match(body: MatchCreate, session: Session = Depends(get_session)) -> 
 @router.get("/{match_id}", response_model=MatchDetail)
 def get_match(match_id: int, session: Session = Depends(get_session)) -> MatchDetail:
     return _detail(_require_match(session, match_id))
+
+
+@router.patch("/{match_id}", response_model=MatchDetail)
+def patch_match(
+    match_id: int, body: MatchUpdate, session: Session = Depends(get_session)
+) -> MatchDetail:
+    match = _require_match(session, match_id)
+    match_service.update_match(
+        session, match, name=body.name, map_name=body.map_name, side=body.side
+    )
+    return _detail(match)
 
 
 @router.delete("/{match_id}", status_code=204, response_model=None)

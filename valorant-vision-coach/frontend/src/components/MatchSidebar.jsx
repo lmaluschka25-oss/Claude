@@ -15,6 +15,7 @@ export default function MatchSidebar({
   onSelectRound,
   onNewMatch,
   onUploaded,
+  onUpdateSide,
 }) {
   const rounds = match?.rounds || [];
   const mem = intelligence?.match_memory;
@@ -30,6 +31,17 @@ export default function MatchSidebar({
           <div><dt>Side</dt><dd className="cap">{match?.side || "—"}</dd></div>
           <div><dt>Rounds</dt><dd>{mem ? `${mem.rounds_analyzed} analyzed` : (rounds.length || 0)}</dd></div>
         </dl>
+        <div className="side-toggle">
+          <span className="side-hint">Your starting side</span>
+          <div className="side-btns">
+            {["attack", "defense"].map((s) => (
+              <button key={s} className={cx("side-btn", match?.side === s && "on")}
+                      onClick={() => onUpdateSide?.(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="panel rounds-panel">

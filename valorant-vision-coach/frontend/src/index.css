@@ -344,3 +344,19 @@ em { font-style: normal; color: var(--faint); }
 .mm-you { fill: #ffd166; font-size: 16px; font-weight: 800; }
 .mm-count { fill: #fff; font-size: 22px; font-weight: 800; }
 .mm-empty { fill: var(--faint); font-size: 22px; }
+
+/* ---- Round view toggle + detection overlay ---- */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.seg-btn { background: transparent; border: none; color: var(--dim); padding: 4px 10px; font-size: 11px; }
+.seg-btn.on { background: var(--elev); color: var(--green); }
+.detect-img img { width: 100%; border-radius: 8px; background: #000; display: block; }
+
+/* ---- Side toggle (sidebar) ---- */
+.side-toggle { padding: 8px 12px; border-top: 1px solid var(--border); }
+.side-hint { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; }
+.side-btns { display: flex; gap: 6px; margin-top: 5px; }
+.side-btn {
+  flex: 1; background: var(--panel-2); border: 1px solid var(--border); color: var(--dim);
+  padding: 6px; border-radius: 7px; text-transform: capitalize; font-size: 12px;
+}
+.side-btn.on { border-color: var(--green); color: var(--green); background: #15331f; font-weight: 600; }

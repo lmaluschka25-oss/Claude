@@ -4,7 +4,7 @@ import { cx } from "./util.js";
 import TopNav from "./components/TopNav.jsx";
 import MatchSidebar from "./components/MatchSidebar.jsx";
 import EnlargedMinimap from "./components/EnlargedMinimap.jsx";
-import RoundVideo from "./components/RoundVideo.jsx";
+import RoundView from "./components/RoundView.jsx";
 import RoundTimeline from "./components/RoundTimeline.jsx";
 import NextRoundHero from "./components/NextRoundHero.jsx";
 import { DetectedInfo, DetectedPositions } from "./components/panels.jsx";
@@ -90,6 +90,15 @@ export default function App() {
     setRoundId(r.id);
     if (r.status === "completed") loadMatch(matchId, r.id);
   }
+  async function updateSide(side) {
+    if (matchId == null) return;
+    try {
+      await api.updateMatch(matchId, { side });
+      await Promise.all([refreshMatches(), loadMatch(matchId, roundId)]);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   const selectedRound =
     (detail?.rounds || []).find((r) => r.id === roundId) || intel?.current_round || null;
@@ -125,7 +134,7 @@ export default function App() {
                 <MatchSidebar
                   match={detail} intelligence={intel} selectedRoundId={roundId}
                   onSelectRound={selectRound} onNewMatch={() => setTab("MATCHES")}
-                  onUploaded={() => loadMatch(matchId, roundId)}
+                  onUploaded={() => loadMatch(matchId, roundId)} onUpdateSide={updateSide}
                 />
                 <div className="center-col">
                   <NextRoundHero
@@ -136,7 +145,7 @@ export default function App() {
                   <EnlargedMinimap mapMeta={mapMeta} markers={intel?.minimap_markers || []} />
                 </div>
                 <div className="right-col">
-                  <RoundVideo round={selectedRound} />
+                  <RoundView round={selectedRound} />
                   <DetectedInfo info={intel?.detected_info} />
                   <DetectedPositions positions={intel?.detected_positions} />
                 </div>

@@ -17,7 +17,7 @@ from collections import Counter, defaultdict
 from sqlalchemy.orm import Session
 
 from ..config import Settings
-from ..models import Detection, Match, ProcessingStatus, Round, Team, UtilityDetection
+from ..models import Detection, Match, ProcessingStatus, Round, Side, Team, UtilityDetection
 from ..schemas import (
     AnalysisLogStep,
     DetectedInfo,
@@ -124,6 +124,20 @@ def _predict(sequence: list[str], sites: list[str]) -> dict[str, float]:
     return {s: round(blended[s] / total, 3) for s in sites}
 
 
+def _effective_side(start: Side, round_number: int) -> Side:
+    """Auto side per round: sides swap at halftime (after round 12), then each half.
+
+    The player picks their *starting* side; the system flips it automatically —
+    no detection needed, it's the Valorant rule.
+    """
+    if start == Side.UNKNOWN:
+        return Side.UNKNOWN
+    half = (max(round_number, 1) - 1) // 12  # 0 = rounds 1–12, 1 = 13–24, …
+    if half % 2 == 0:
+        return start
+    return Side.DEFENSE if start == Side.ATTACK else Side.ATTACK
+
+
 def _confidence(rounds_analyzed: int) -> tuple[float, str]:
     conf = min(0.9, 0.2 + 0.12 * rounds_analyzed)
     if conf < 0.45:
@@ -189,8 +203,10 @@ def build_match_intelligence(
     )
 
     patterns = _patterns(site_sequence, agent_site_counts, rounds_analyzed)
+    next_round_no = max((r.round_number for r in completed), default=0) + 1
+    next_side = _effective_side(match.side, next_round_no)
     recommendation = _recommendation(
-        site_presence, prob_map, sites, conf, conf_label, agent_site_counts
+        site_presence, prob_map, sites, conf, conf_label, agent_site_counts, next_side
     )
     learnings = _learnings(rounds_analyzed, site_presence, agent_site_counts, recommendation)
 
@@ -238,8 +254,8 @@ def _learnings(rounds_analyzed, site_presence, agent_site_counts, rec) -> list[s
             break
     if rec and rec.best_site:
         out.append(
-            f"Recommended attack: {rec.best_site} — the least-defended site "
-            f"({round(rec.success_probability * 100)}% est. success, {rec.confidence_label})."
+            f"Next round: {rec.action_label} {rec.best_site} "
+            f"({round(rec.success_probability * 100)}% est., {rec.confidence_label})."
         )
     return out
 
@@ -250,11 +266,13 @@ def _detected_info(current: Round | None, match: Match, game_map) -> DetectedInf
         return None
     deaths_ally = sum(1 for k in current.killfeed if k.killer_team == Team.ENEMY)
     deaths_enemy = sum(1 for k in current.killfeed if k.killer_team == Team.ALLY)
+    known = match.side != Side.UNKNOWN
+    side = _effective_side(match.side, current.round_number) if known else current.side
     return DetectedInfo(
         map_name=current.map_name or match.map_name,
         map_confidence=current.map_confidence or (0.99 if (current.map_name or match.map_name) else 0.0),
-        side=current.side if current.side != current.side.UNKNOWN else match.side,
-        side_confidence=current.side_confidence,
+        side=side,
+        side_confidence=0.95 if known else current.side_confidence,
         round_number=current.round_number,
         score_text=current.score_text,
         round_time=current.round_time,
@@ -441,33 +459,54 @@ def _economy(current: Round | None) -> WeaponEconomy:
     )
 
 
-def _recommendation(site_presence, prob_map, sites, conf, conf_label, agent_site_counts) -> Recommendation:
+def _recommendation(
+    site_presence, prob_map, sites, conf, conf_label, agent_site_counts, side: Side
+) -> Recommendation:
     if not site_presence or all(v == 0 for v in site_presence.values()):
         return Recommendation(
-            best_site=None, success_probability=0.0, confidence=conf,
-            confidence_label=conf_label, reasons=["Not enough data yet."],
+            best_site=None, mode="attack", action_label="Attack", success_probability=0.0,
+            confidence=conf, confidence_label=conf_label, reasons=["Not enough data yet."],
             suggested_play=["Upload more rounds to build a read."])
-    # Recommend an actual bomb site (exclude the MID region) — the one enemies
-    # commit to least.
+
     plantable = [s for s in sites if s.upper() != "MID"] or sites
-    best_site = min(plantable, key=lambda s: site_presence.get(s, 0.0))
     top_site = max(sites, key=lambda s: site_presence.get(s, 0.0))
-    success = round(min(0.92, 0.5 + 0.45 * (1.0 - site_presence.get(best_site, 0.0))), 3)
-    reasons = [f"Enemies commit to {top_site} most ({round(site_presence[top_site]*100)}% of rounds)."]
+
+    if side == Side.DEFENSE:
+        # You defend → the enemy attacks. Stack the site they hit most.
+        best = max(plantable, key=lambda s: site_presence.get(s, 0.0))
+        success = round(min(0.95, 0.4 + 0.5 * site_presence.get(best, 0.0)), 3)
+        reasons = [
+            f"As defenders, expect attacks on {best} "
+            f"({round(site_presence.get(best, 0) * 100)}% of rounds went there).",
+            f"{best} is their most-committed site so far.",
+        ]
+        suggested = [
+            f"Stack {best} with 2–3 players.",
+            "Hold utility for delay / retake.",
+            "Keep one watching the lightly-hit sites for a flank.",
+        ]
+        return Recommendation(
+            best_site=best, mode="defense", action_label="Stack", success_probability=success,
+            confidence=conf, confidence_label=conf_label, reasons=reasons, suggested_play=suggested)
+
+    # You attack (or unknown) → hit the least-defended site.
+    best = min(plantable, key=lambda s: site_presence.get(s, 0.0))
+    success = round(min(0.92, 0.5 + 0.45 * (1.0 - site_presence.get(best, 0.0))), 3)
+    reasons = [f"Enemies defend {top_site} most ({round(site_presence[top_site] * 100)}% of rounds)."]
     for agent, c in agent_site_counts.items():
-        site, n = c.most_common(1)[0]
-        if site == "B" and agent != "You":
+        s, _ = c.most_common(1)[0]
+        if s == "B" and agent != "You":
             reasons.append(f"{agent} anchors B → limited support elsewhere.")
             break
-    reasons.append(f"{best_site} shows the lightest defensive commitment.")
+    reasons.append(f"{best} shows the lightest defensive commitment.")
     suggested = [
-        f"Take {best_site} with 3–4 players.",
+        f"Take {best} with 3–4 players.",
         "Use utility to block rotations and cut off support.",
         "Expect a lone anchor on site — trade fast.",
     ]
     return Recommendation(
-        best_site=best_site, success_probability=success, confidence=conf,
-        confidence_label=conf_label, reasons=reasons, suggested_play=suggested)
+        best_site=best, mode="attack", action_label="Attack", success_probability=success,
+        confidence=conf, confidence_label=conf_label, reasons=reasons, suggested_play=suggested)
 
 
 def _log(match, current, rounds_analyzed, game_map) -> list[AnalysisLogStep]:
