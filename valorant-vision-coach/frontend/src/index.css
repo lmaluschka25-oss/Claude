@@ -253,6 +253,13 @@ select {
   font-size: 11px;
   color: var(--good);
 }
+.sub-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+  margin: 6px 0;
+}
 
 .pill {
   display: inline-flex;

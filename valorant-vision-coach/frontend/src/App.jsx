@@ -7,6 +7,7 @@ import Timeline from "./components/Timeline.jsx";
 import LastKnownPanel from "./components/LastKnownPanel.jsx";
 import RotationPanel from "./components/RotationPanel.jsx";
 import SitePressurePanel from "./components/SitePressurePanel.jsx";
+import TendenciesPanel from "./components/TendenciesPanel.jsx";
 
 export default function App() {
   const [info, setInfo] = useState(null);
@@ -16,6 +17,7 @@ export default function App() {
   const [detail, setDetail] = useState(null);
   const [mapMeta, setMapMeta] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
+  const [tendencies, setTendencies] = useState(null);
   const [at, setAt] = useState(0);
   const [ttl, setTtl] = useState(12);
   const [playing, setPlaying] = useState(false);
@@ -55,6 +57,7 @@ export default function App() {
       setDetail(d);
       setAt(d.duration_seconds || 0);
       setPlaying(false);
+      api.getTendencies(id).then(setTendencies).catch(() => setTendencies(null));
       if (d.map_name) {
         api.getMap(d.map_name).then(setMapMeta).catch(() => setMapMeta(null));
       } else {
@@ -109,6 +112,7 @@ export default function App() {
     } else {
       setDetail(null);
       setMapMeta(null);
+      setTendencies(null);
     }
   }
 
@@ -230,6 +234,7 @@ export default function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <LastKnownPanel lastKnown={snapshot?.last_known || []} />
                   <SitePressurePanel sitePressure={snapshot?.site_pressure || []} />
+                  <TendenciesPanel report={tendencies} />
                 </div>
               </div>
               <RotationPanel rotations={snapshot?.rotations || []} />

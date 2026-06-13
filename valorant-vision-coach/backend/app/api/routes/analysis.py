@@ -8,6 +8,7 @@ from ...analysis.engine import build_snapshot
 from ...analysis.last_known_position import to_last_known
 from ...analysis.rotation import estimate_rotations
 from ...analysis.site_pressure import estimate_site_pressure
+from ...analysis.tendencies import build_tendencies
 from ...analysis.tracks import build_enemy_tracks
 from ...config import Settings
 from ...schemas import (
@@ -15,6 +16,7 @@ from ...schemas import (
     EnemyRotation,
     LastKnownPosition,
     SitePressure,
+    TendencyReport,
 )
 from ...services import match_service
 from ...vision.maps import load_map
@@ -106,6 +108,17 @@ def site_pressure(
     return estimate_site_pressure(
         detections, load_map(match.map_name), at_seconds, ttl_seconds, settings
     )
+
+
+@router.get("/tendencies", response_model=TendencyReport)
+def tendencies(
+    match_id: int,
+    session: Session = Depends(get_session),
+) -> TendencyReport:
+    """Post-match scouting report: enemy site tendencies across all rounds."""
+    match = _require_match(session, match_id)
+    detections = match_service.get_detections(session, match_id)
+    return build_tendencies(detections, match_id, match.map_name, load_map(match.map_name))
 
 
 def _require_match(session: Session, match_id: int):

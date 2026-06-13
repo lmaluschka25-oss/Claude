@@ -115,6 +115,39 @@ class AnalysisSnapshot(BaseModel):
     site_pressure: list[SitePressure]
 
 
+# ---- Tendencies (scouting report) ---------------------------------------
+class SiteFrequency(BaseModel):
+    site: str
+    rounds: int = Field(description="Number of rounds the enemy committed to this site.")
+    share: float = Field(description="Fraction of analyzed rounds in [0, 1].")
+
+
+class AgentSiteShare(BaseModel):
+    site: str
+    share: float
+
+
+class AgentSitePreference(BaseModel):
+    agent_name: str | None
+    rounds_seen: int
+    sites: list[AgentSiteShare]
+
+
+class TendencyReport(BaseModel):
+    """Aggregated enemy site tendencies across the analyzed rounds.
+
+    A *post-match* scouting report (where did they tend to go, which site does
+    each agent favor) — derived only from observed sightings, for study and
+    preparation. It is not a live in-match overlay.
+    """
+
+    match_id: int
+    map_name: str | None
+    rounds_analyzed: int
+    site_frequency: list[SiteFrequency]
+    agent_site_preference: list[AgentSitePreference]
+
+
 # ---- Maps ----------------------------------------------------------------
 class CalloutOut(BaseModel):
     id: str

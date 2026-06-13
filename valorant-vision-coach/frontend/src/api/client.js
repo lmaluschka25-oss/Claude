@@ -38,6 +38,7 @@ export const api = {
     if (ttl != null) params.set("ttl", ttl);
     return req(`/matches/${id}/analysis/snapshot?${params.toString()}`);
   },
+  getTendencies: (id) => req(`/matches/${id}/analysis/tendencies`),
 
   // Upload with progress via XHR (fetch lacks upload progress events).
   uploadMatch(file, mapName, onProgress) {
