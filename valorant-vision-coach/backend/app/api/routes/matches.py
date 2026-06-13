@@ -160,6 +160,8 @@ def minimap_preview(
     h_frac: float | None = None,
     sat_min: int | None = None,
     val_min: int | None = None,
+    hue_min: int | None = None,
+    hue_max: int | None = None,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> Response:
@@ -190,6 +192,10 @@ def minimap_preview(
         detector.sat_min = sat_min
     if val_min is not None:
         detector.val_min = val_min
+    if hue_min is not None:
+        detector.hue_min = hue_min
+    if hue_max is not None:
+        detector.hue_max = hue_max
 
     if mask:
         frame = detector.mask_overlay(frame)

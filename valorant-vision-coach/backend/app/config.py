@@ -67,14 +67,14 @@ class Settings(BaseSettings):
     minimap_h_frac: float = 0.396
     minimap_rotation: int = 0
     minimap_flip_x: bool = False
-    # Red enemy-marker color gate (HSV) and blob-area bounds (pixels).
-    # Strict by default: only bright, saturated, pure red passes — so warm
-    # background textures (a translucent big map over the world) are rejected.
-    # Hue wraps: pixels with hue <= hue_lo OR >= hue_hi count as red.
-    minimap_enemy_sat_min: int = 150
-    minimap_enemy_val_min: int = 150
-    minimap_enemy_hue_lo: int = 6
-    minimap_enemy_hue_hi: int = 174
+    # Enemy markers are matched by an HSV hue band [hue_min, hue_max] (OpenCV
+    # hue 0–179). Valorant shows enemies in different tones per setup — many are
+    # YELLOW (hue ~18–45), some red. Default to yellow; tune the band live in the
+    # Settings tab with the color mask until only enemy dots light up.
+    minimap_enemy_hue_min: int = 18
+    minimap_enemy_hue_max: int = 45
+    minimap_enemy_sat_min: int = 90
+    minimap_enemy_val_min: int = 120
     minimap_min_area: float = 3.0
     minimap_max_area: float = 600.0
 

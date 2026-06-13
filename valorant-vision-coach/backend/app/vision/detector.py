@@ -281,8 +281,8 @@ class MinimapColorDetector(BaseDetector):
         self.calibration = calibration or settings.minimap_calibration()
         self.sat_min = settings.minimap_enemy_sat_min
         self.val_min = settings.minimap_enemy_val_min
-        self.hue_lo = settings.minimap_enemy_hue_lo
-        self.hue_hi = settings.minimap_enemy_hue_hi
+        self.hue_min = settings.minimap_enemy_hue_min
+        self.hue_max = settings.minimap_enemy_hue_max
         self.min_area = settings.minimap_min_area
         self.max_area = settings.minimap_max_area
 
@@ -297,11 +297,9 @@ class MinimapColorDetector(BaseDetector):
             return rx, ry, rw, rh, None
 
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-        lower1 = np.array([0, self.sat_min, self.val_min])
-        upper1 = np.array([self.hue_lo, 255, 255])
-        lower2 = np.array([self.hue_hi, self.sat_min, self.val_min])
-        upper2 = np.array([179, 255, 255])
-        mask = cv2.inRange(hsv, lower1, upper1) | cv2.inRange(hsv, lower2, upper2)
+        lower = np.array([self.hue_min, self.sat_min, self.val_min])
+        upper = np.array([self.hue_max, 255, 255])
+        mask = cv2.inRange(hsv, lower, upper)
         kernel = np.ones((2, 2), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)

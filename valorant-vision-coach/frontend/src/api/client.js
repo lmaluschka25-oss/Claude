@@ -45,7 +45,7 @@ export const api = {
   minimapPreviewUrl: (id, opts = {}) => {
     const p = new URLSearchParams({ t: opts.t ?? 0 });
     if (opts.mask) p.set("mask", "1");
-    for (const k of ["x_frac", "y_frac", "w_frac", "h_frac", "sat_min", "val_min"]) {
+    for (const k of ["x_frac", "y_frac", "w_frac", "h_frac", "sat_min", "val_min", "hue_min", "hue_max"]) {
       if (opts[k] != null) p.set(k, opts[k]);
     }
     return `${BASE}/rounds/${id}/minimap-preview?${p.toString()}`;
