@@ -22,8 +22,12 @@ RUN pip install --upgrade pip \
 COPY app ./app
 COPY data ./data
 
-# Persisted at runtime via a volume (uploads + sqlite db live under data/).
-VOLUME ["/app/data"]
+# Read-only app assets (maps, models) live in /app/data and ship in the image.
+# Writable state (uploads + sqlite db) goes to /app/var, which compose persists
+# via a named volume — kept separate so a volume never shadows the bundled maps.
+ENV VVC_UPLOAD_DIR=/app/var/uploads \
+    VVC_DATABASE_URL=sqlite:////app/var/vision_coach.db
+RUN mkdir -p /app/var
 
 EXPOSE 8000
 

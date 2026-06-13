@@ -18,7 +18,9 @@ services:
       VVC_FRAME_SAMPLE_STRIDE: "${VVC_FRAME_SAMPLE_STRIDE:-6}"
       VVC_CORS_ORIGINS: '["http://localhost:5173"]'
     volumes:
-      - vvc-data:/app/data
+      # Persist only writable state (uploads + db). Maps/models stay in the
+      # image at /app/data so a stale volume can never hide bundled maps.
+      - vvc-data:/app/var
     ports:
       - "8000:8000"
     restart: unless-stopped
