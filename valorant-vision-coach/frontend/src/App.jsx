@@ -5,20 +5,8 @@ import MatchSidebar from "./components/MatchSidebar.jsx";
 import EnlargedMinimap from "./components/EnlargedMinimap.jsx";
 import RoundVideo from "./components/RoundVideo.jsx";
 import RoundTimeline from "./components/RoundTimeline.jsx";
-import Heatmap from "./components/Heatmap.jsx";
-import {
-  AnalysisLog,
-  DetectedInfo,
-  DetectedPositions,
-  EnemyProfiles,
-  MatchMemory,
-  PatternRecognition,
-  PositionProbabilities,
-  ReasoningPanel,
-  RecommendationPanel,
-  UtilityDetected,
-  WeaponEconomy,
-} from "./components/panels.jsx";
+import NextRoundHero from "./components/NextRoundHero.jsx";
+import { DetectedInfo, DetectedPositions } from "./components/panels.jsx";
 import MatchesView from "./views/MatchesView.jsx";
 import LearningsView from "./views/LearningsView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
@@ -66,7 +54,6 @@ export default function App() {
     if (matchId != null) loadMatch(matchId);
   }, [matchId, loadMatch]);
 
-  // Poll while any round is still processing.
   const processing = useMemo(
     () => (detail?.rounds || []).some((r) => r.status === "processing" || r.status === "pending"),
     [detail]
@@ -83,13 +70,11 @@ export default function App() {
     setMatchId(m.id);
     setTab("ANALYSIS");
   }
-
   function selectMatch(m) {
     setMatchId(m.id);
     setRoundId(null);
     setTab("ANALYSIS");
   }
-
   async function deleteMatch(id) {
     if (!confirm("Delete this match and all its rounds?")) return;
     await api.deleteMatch(id);
@@ -100,7 +85,6 @@ export default function App() {
     }
     refreshMatches();
   }
-
   function selectRound(r) {
     setRoundId(r.id);
     if (r.status === "completed") loadMatch(matchId, r.id);
@@ -114,7 +98,9 @@ export default function App() {
   return (
     <div className="app">
       <TopNav tab={tab} onTab={setTab} info={info} />
-      {error && <div className="error-banner top">{error}<button onClick={() => setError(null)}>✕</button></div>}
+      {error && (
+        <div className="error-banner top">{error}<button onClick={() => setError(null)}>✕</button></div>
+      )}
 
       {tab === "MATCHES" && (
         <MatchesView
@@ -122,7 +108,6 @@ export default function App() {
           onCreate={createMatch} onSelect={selectMatch} onDelete={deleteMatch}
         />
       )}
-
       {tab === "LEARNINGS" && <LearningsView intelligence={intel} mapMeta={mapMeta} />}
       {tab === "SETTINGS" && <SettingsView info={info} calibrationRound={calibrationRound} />}
 
@@ -140,37 +125,25 @@ export default function App() {
                   onSelectRound={selectRound} onNewMatch={() => setTab("MATCHES")}
                   onUploaded={() => loadMatch(matchId, roundId)}
                 />
-                <EnlargedMinimap mapMeta={mapMeta} markers={intel?.minimap_markers || []} />
+                <div className="center-col">
+                  <NextRoundHero
+                    rec={intel?.recommendation}
+                    probs={intel?.position_probabilities || []}
+                    roundsAnalyzed={intel?.match_memory?.rounds_analyzed || 0}
+                  />
+                  <EnlargedMinimap mapMeta={mapMeta} markers={intel?.minimap_markers || []} />
+                </div>
                 <div className="right-col">
                   <RoundVideo round={selectedRound} />
-                  <div className="grid-2">
-                    <DetectedInfo info={intel?.detected_info} />
-                    <UtilityDetected utilities={intel?.utilities} />
-                  </div>
+                  <DetectedInfo info={intel?.detected_info} />
+                  <DetectedPositions positions={intel?.detected_positions} />
                 </div>
               </div>
-
               <RoundTimeline events={intel?.timeline} />
-
-              <div className="grid-4">
-                <DetectedPositions positions={intel?.detected_positions} />
-                <PositionProbabilities probs={intel?.position_probabilities} />
-                <PatternRecognition patterns={intel?.patterns} />
-                <Heatmap cells={intel?.heatmap} mapMeta={mapMeta} />
+              <div className="analysis-hint muted small">
+                Deeper read — patterns, profiles, heatmap and the full analysis log — is in the
+                <button className="linkbtn" onClick={() => setTab("LEARNINGS")}>LEARNINGS</button> tab.
               </div>
-
-              <div className="grid-3">
-                <MatchMemory memory={intel?.match_memory} />
-                <EnemyProfiles profiles={intel?.enemy_profiles} />
-                <WeaponEconomy economy={intel?.weapon_economy} />
-              </div>
-
-              <div className="grid-2">
-                <RecommendationPanel rec={intel?.recommendation} />
-                <ReasoningPanel rec={intel?.recommendation} />
-              </div>
-
-              <AnalysisLog steps={intel?.analysis_log} />
             </>
           )}
         </div>

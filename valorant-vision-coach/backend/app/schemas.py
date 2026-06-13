@@ -205,6 +205,7 @@ class MatchIntelligence(BaseModel):
     enemy_profiles: list[EnemyProfile]
     weapon_economy: WeaponEconomy
     recommendation: Recommendation
+    learnings: list[str]
     analysis_log: list[AnalysisLogStep]
 
 

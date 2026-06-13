@@ -188,6 +188,12 @@ def build_match_intelligence(
         key=lambda x: x.probability, reverse=True,
     )
 
+    patterns = _patterns(site_sequence, agent_site_counts, rounds_analyzed)
+    recommendation = _recommendation(
+        site_presence, prob_map, sites, conf, conf_label, agent_site_counts
+    )
+    learnings = _learnings(rounds_analyzed, site_presence, agent_site_counts, recommendation)
+
     intel = MatchIntelligence(
         match=summary,
         current_round=RoundOut.model_validate(current) if current else None,
@@ -197,15 +203,45 @@ def build_match_intelligence(
         timeline=_timeline(current),
         detected_positions=_live_positions(current),
         position_probabilities=position_probabilities,
-        patterns=_patterns(site_sequence, agent_site_counts, rounds_analyzed),
+        patterns=patterns,
         heatmap=_heatmap(all_enemy_points),
         match_memory=_memory(rounds_analyzed, site_presence, util_counter, current, conf),
         enemy_profiles=_profiles(agent_site_counts, rounds_analyzed),
         weapon_economy=_economy(current),
-        recommendation=_recommendation(site_presence, prob_map, sites, conf, conf_label, agent_site_counts),
+        recommendation=recommendation,
+        learnings=learnings,
         analysis_log=_log(match, current, rounds_analyzed, game_map),
     )
     return intel
+
+
+def _learnings(rounds_analyzed, site_presence, agent_site_counts, rec) -> list[str]:
+    """Plain-language description of what the system has learned so far."""
+    if not rounds_analyzed:
+        return ["No rounds analyzed yet — add rounds to start learning the opponent."]
+    out: list[str] = []
+    ranked = sorted(site_presence.items(), key=lambda kv: kv[1], reverse=True)
+    if ranked and ranked[0][1] > 0:
+        top, share = ranked[0]
+        spread = ", ".join(f"{s} {round(v * 100)}%" for s, v in ranked if v > 0)
+        out.append(
+            f"Across {rounds_analyzed} round(s), the enemy committed most to {top} "
+            f"({round(share * 100)}%). Full split: {spread}."
+        )
+    for agent, c in sorted(agent_site_counts.items(), key=lambda kv: -sum(kv[1].values())):
+        if agent == "You":
+            continue
+        site, n = c.most_common(1)[0]
+        seen = sum(c.values())
+        out.append(f"{agent} is mostly seen near {site} ({n}/{seen} of their sightings).")
+        if len(out) >= 5:
+            break
+    if rec and rec.best_site:
+        out.append(
+            f"Recommended attack: {rec.best_site} — the least-defended site "
+            f"({round(rec.success_probability * 100)}% est. success, {rec.confidence_label})."
+        )
+    return out
 
 
 # ---- Section builders ----------------------------------------------------
