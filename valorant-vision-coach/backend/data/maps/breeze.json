@@ -1,0 +1,35 @@
+{
+  "name": "breeze",
+  "display_name": "Breeze",
+  "image": "breeze.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.78, "y": 0.30, "site": "A"},
+    {"id": "a_main", "name": "A Main", "x": 0.70, "y": 0.62},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.66, "y": 0.82},
+    {"id": "a_hall", "name": "A Hall", "x": 0.86, "y": 0.45},
+    {"id": "a_cave", "name": "A Cave", "x": 0.62, "y": 0.40},
+    {"id": "a_bridge", "name": "Bridge", "x": 0.55, "y": 0.30},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.55},
+    {"id": "mid_top", "name": "Mid Top", "x": 0.50, "y": 0.40},
+    {"id": "mid_pillar", "name": "Mid Pillar", "x": 0.45, "y": 0.55},
+    {"id": "mid_doors", "name": "Mid Doors", "x": 0.50, "y": 0.68},
+    {"id": "b_site", "name": "B Site", "x": 0.22, "y": 0.30, "site": "B"},
+    {"id": "b_main", "name": "B Main", "x": 0.20, "y": 0.60},
+    {"id": "b_lobby", "name": "B Lobby", "x": 0.26, "y": 0.82},
+    {"id": "b_window", "name": "B Window", "x": 0.30, "y": 0.42},
+    {"id": "b_elbow", "name": "B Elbow", "x": 0.34, "y": 0.50},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.46, "y": 0.93},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.10}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "b_lobby"], ["attacker_spawn", "mid_doors"],
+    ["a_lobby", "a_main"], ["a_main", "a_site"], ["a_main", "a_cave"], ["a_cave", "a_site"],
+    ["a_site", "a_hall"], ["a_hall", "defender_spawn"], ["a_bridge", "a_site"], ["a_bridge", "mid_top"],
+    ["a_cave", "a_bridge"],
+    ["mid_doors", "mid"], ["mid", "mid_pillar"], ["mid", "mid_top"], ["mid_pillar", "b_elbow"],
+    ["b_lobby", "b_main"], ["b_main", "b_site"], ["b_site", "b_window"], ["b_window", "b_elbow"],
+    ["b_elbow", "mid_pillar"], ["b_site", "defender_spawn"],
+    ["defender_spawn", "mid_top"]
+  ]
+}

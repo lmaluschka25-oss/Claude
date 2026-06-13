@@ -1,0 +1,32 @@
+{
+  "name": "abyss",
+  "display_name": "Abyss",
+  "image": "abyss.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.74, "y": 0.30, "site": "A"},
+    {"id": "a_main", "name": "A Main", "x": 0.72, "y": 0.62},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.70, "y": 0.82},
+    {"id": "a_link", "name": "A Link", "x": 0.64, "y": 0.46},
+    {"id": "a_secret", "name": "A Secret", "x": 0.60, "y": 0.38},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.55},
+    {"id": "mid_top", "name": "Mid Top", "x": 0.50, "y": 0.42},
+    {"id": "mid_bridge", "name": "Bridge", "x": 0.50, "y": 0.34},
+    {"id": "mid_well", "name": "Mid Well", "x": 0.46, "y": 0.62},
+    {"id": "b_site", "name": "B Site", "x": 0.26, "y": 0.30, "site": "B"},
+    {"id": "b_main", "name": "B Main", "x": 0.28, "y": 0.62},
+    {"id": "b_lobby", "name": "B Lobby", "x": 0.30, "y": 0.82},
+    {"id": "b_link", "name": "B Link", "x": 0.36, "y": 0.46},
+    {"id": "b_tower", "name": "B Tower", "x": 0.22, "y": 0.42},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.12}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "b_lobby"], ["attacker_spawn", "mid_well"],
+    ["a_lobby", "a_main"], ["a_main", "a_link"], ["a_link", "a_site"], ["a_secret", "a_site"],
+    ["a_secret", "mid_bridge"],
+    ["mid_well", "mid"], ["mid", "mid_top"], ["mid_top", "mid_bridge"], ["mid_top", "b_link"],
+    ["b_lobby", "b_main"], ["b_main", "b_link"], ["b_link", "b_site"], ["b_site", "b_tower"],
+    ["b_tower", "defender_spawn"], ["defender_spawn", "a_site"], ["defender_spawn", "mid_bridge"]
+  ]
+}

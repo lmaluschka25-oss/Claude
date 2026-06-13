@@ -1,0 +1,33 @@
+{
+  "name": "sunset",
+  "display_name": "Sunset",
+  "image": "sunset.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.74, "y": 0.30, "site": "A"},
+    {"id": "a_main", "name": "A Main", "x": 0.72, "y": 0.62},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.70, "y": 0.82},
+    {"id": "a_alley", "name": "A Alley", "x": 0.66, "y": 0.48},
+    {"id": "a_elbow", "name": "A Elbow", "x": 0.62, "y": 0.40},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.55},
+    {"id": "mid_top", "name": "Mid Top", "x": 0.50, "y": 0.42},
+    {"id": "mid_courtyard", "name": "Mid Courtyard", "x": 0.50, "y": 0.66},
+    {"id": "mid_tiles", "name": "Tiles", "x": 0.44, "y": 0.48},
+    {"id": "boba", "name": "Boba", "x": 0.40, "y": 0.40},
+    {"id": "b_site", "name": "B Site", "x": 0.26, "y": 0.30, "site": "B"},
+    {"id": "b_main", "name": "B Main", "x": 0.28, "y": 0.62},
+    {"id": "b_market", "name": "B Market", "x": 0.34, "y": 0.48},
+    {"id": "b_lobby", "name": "B Lobby", "x": 0.30, "y": 0.82},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.12}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "b_lobby"], ["attacker_spawn", "mid_courtyard"],
+    ["a_lobby", "a_main"], ["a_main", "a_alley"], ["a_alley", "a_site"], ["a_elbow", "a_site"],
+    ["a_elbow", "mid_top"],
+    ["mid_courtyard", "mid"], ["mid", "mid_top"], ["mid", "mid_tiles"], ["mid_tiles", "b_market"],
+    ["mid_top", "boba"], ["boba", "a_elbow"],
+    ["b_lobby", "b_main"], ["b_main", "b_market"], ["b_market", "b_site"], ["b_site", "defender_spawn"],
+    ["defender_spawn", "a_site"], ["defender_spawn", "mid_top"]
+  ]
+}

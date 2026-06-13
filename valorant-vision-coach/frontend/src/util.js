@@ -28,3 +28,15 @@ export function pressureColor(p) {
   if (p >= 0.33) return "#ffb454";
   return "#19c3a6";
 }
+
+export function formatDateTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

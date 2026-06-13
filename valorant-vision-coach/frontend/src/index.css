@@ -242,6 +242,16 @@ select {
   color: var(--text-dim);
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+.match .name .check {
+  color: var(--good);
+  font-weight: 800;
+  margin-right: 6px;
+}
+.analyzed-line {
+  font-size: 11px;
+  color: var(--good);
 }
 
 .pill {

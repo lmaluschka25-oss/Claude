@@ -1,0 +1,33 @@
+{
+  "name": "icebox",
+  "display_name": "Icebox",
+  "image": "icebox.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.74, "y": 0.30, "site": "A"},
+    {"id": "a_belt", "name": "A Belt", "x": 0.72, "y": 0.42},
+    {"id": "a_pipes", "name": "A Pipes", "x": 0.66, "y": 0.55},
+    {"id": "a_nest", "name": "A Nest", "x": 0.80, "y": 0.45},
+    {"id": "a_main", "name": "A Main", "x": 0.62, "y": 0.72},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.55},
+    {"id": "mid_blue", "name": "Blue", "x": 0.50, "y": 0.45},
+    {"id": "mid_orange", "name": "Orange", "x": 0.44, "y": 0.62},
+    {"id": "kitchen", "name": "Kitchen", "x": 0.40, "y": 0.30},
+    {"id": "b_site", "name": "B Site", "x": 0.26, "y": 0.32, "site": "B"},
+    {"id": "b_yellow", "name": "Yellow", "x": 0.30, "y": 0.46},
+    {"id": "b_green", "name": "Green", "x": 0.34, "y": 0.55},
+    {"id": "b_main", "name": "B Main", "x": 0.30, "y": 0.74},
+    {"id": "b_snowman", "name": "Snowman", "x": 0.22, "y": 0.45},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.12}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_main"], ["attacker_spawn", "b_main"], ["attacker_spawn", "mid_orange"],
+    ["a_main", "a_pipes"], ["a_pipes", "a_site"], ["a_pipes", "a_belt"], ["a_belt", "a_site"],
+    ["a_site", "a_nest"], ["a_nest", "mid_blue"],
+    ["mid_orange", "mid"], ["mid", "mid_blue"], ["mid", "b_green"], ["mid_blue", "kitchen"],
+    ["kitchen", "b_site"], ["kitchen", "a_site"],
+    ["b_main", "b_green"], ["b_green", "b_yellow"], ["b_yellow", "b_site"], ["b_site", "b_snowman"],
+    ["b_snowman", "defender_spawn"], ["defender_spawn", "a_nest"], ["defender_spawn", "kitchen"]
+  ]
+}
