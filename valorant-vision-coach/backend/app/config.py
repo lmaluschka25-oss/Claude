@@ -71,10 +71,14 @@ class Settings(BaseSettings):
     # hue 0–179). Valorant shows enemies in different tones per setup — many are
     # YELLOW (hue ~18–45), some red. Default to yellow; tune the band live in the
     # Settings tab with the color mask until only enemy dots light up.
+    # Enemy color detection. "auto" finds saturated RED *and* YELLOW markers
+    # with no tuning (the two common Valorant enemy tones); "red"/"yellow" lock
+    # one; "custom" uses the hue band below.
+    minimap_color_mode: str = "auto"
     minimap_enemy_hue_min: int = 18
     minimap_enemy_hue_max: int = 45
-    minimap_enemy_sat_min: int = 160
-    minimap_enemy_val_min: int = 150
+    minimap_enemy_sat_min: int = 150
+    minimap_enemy_val_min: int = 140
     minimap_min_area: float = 4.0
     minimap_max_area: float = 260.0
 

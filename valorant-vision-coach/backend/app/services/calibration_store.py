@@ -12,7 +12,7 @@ from ..config import Settings
 
 FIELDS = (
     "x_frac", "y_frac", "w_frac", "h_frac", "rotation", "flip_x",
-    "hue_min", "hue_max", "sat_min", "val_min", "min_area", "max_area",
+    "color_mode", "hue_min", "hue_max", "sat_min", "val_min", "min_area", "max_area",
     "analysis_interval", "confidence_threshold", "pattern_weight",
     "memory_weight", "recommendation_min_confidence", "timeline_detail",
 )
@@ -30,6 +30,7 @@ def defaults(settings: Settings) -> dict:
         "h_frac": settings.minimap_h_frac,
         "rotation": settings.minimap_rotation,
         "flip_x": settings.minimap_flip_x,
+        "color_mode": settings.minimap_color_mode,
         "hue_min": settings.minimap_enemy_hue_min,
         "hue_max": settings.minimap_enemy_hue_max,
         "sat_min": settings.minimap_enemy_sat_min,
@@ -66,6 +67,17 @@ def save(settings: Settings, updates: dict) -> dict:
     return data
 
 
+def reset(settings: Settings) -> dict:
+    """Delete saved overrides → back to config defaults."""
+    path = _path(settings)
+    if path.exists():
+        try:
+            path.unlink()
+        except OSError:
+            pass
+    return defaults(settings)
+
+
 def calibration(settings: Settings):
     from ..vision.calibration import MinimapCalibration
 
@@ -81,6 +93,7 @@ def apply_to_detector(detector, settings: Settings) -> None:
     """Push the stored calibration + color band onto a MinimapColorDetector."""
     d = load(settings)
     detector.calibration = calibration(settings)
+    detector.color_mode = str(d.get("color_mode", "auto"))
     detector.hue_min = int(d["hue_min"])
     detector.hue_max = int(d["hue_max"])
     detector.sat_min = int(d["sat_min"])

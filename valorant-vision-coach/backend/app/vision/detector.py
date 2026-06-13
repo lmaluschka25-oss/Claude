@@ -279,6 +279,7 @@ class MinimapColorDetector(BaseDetector):
     def __init__(self, settings: Settings, calibration: MinimapCalibration | None = None) -> None:
         self.settings = settings
         self.calibration = calibration or settings.minimap_calibration()
+        self.color_mode = getattr(settings, "minimap_color_mode", "auto")
         self.sat_min = settings.minimap_enemy_sat_min
         self.val_min = settings.minimap_enemy_val_min
         self.hue_min = settings.minimap_enemy_hue_min
@@ -286,8 +287,28 @@ class MinimapColorDetector(BaseDetector):
         self.min_area = settings.minimap_min_area
         self.max_area = settings.minimap_max_area
 
+    def _build_mask(self, hsv):
+        """Binary mask of enemy-coloured pixels per the selected color mode."""
+        import cv2
+
+        s, v = self.sat_min, self.val_min
+
+        def band(lo_h, hi_h):
+            return cv2.inRange(hsv, np.array([lo_h, s, v]), np.array([hi_h, 255, 255]))
+
+        mode = (self.color_mode or "auto").lower()
+        if mode == "red":
+            mask = band(0, 10) | band(168, 179)
+        elif mode == "yellow":
+            mask = band(15, 40)
+        elif mode == "custom":
+            mask = band(self.hue_min, self.hue_max)
+        else:  # auto: saturated red OR yellow (the two common enemy tones)
+            mask = band(0, 10) | band(168, 179) | band(15, 40)
+        return mask
+
     def _roi_mask(self, frame: np.ndarray):
-        """Return the minimap ROI box and the binary red-marker mask within it."""
+        """Return the minimap ROI box and the binary enemy-marker mask within it."""
         import cv2
 
         h, w = frame.shape[:2]
@@ -297,9 +318,7 @@ class MinimapColorDetector(BaseDetector):
             return rx, ry, rw, rh, None
 
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-        lower = np.array([self.hue_min, self.sat_min, self.val_min])
-        upper = np.array([self.hue_max, 255, 255])
-        mask = cv2.inRange(hsv, lower, upper)
+        mask = self._build_mask(hsv)
         kernel = np.ones((2, 2), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
@@ -318,13 +337,22 @@ class MinimapColorDetector(BaseDetector):
             area = cv2.contourArea(c)
             if not (self.min_area <= area <= self.max_area):
                 continue
+            # Enemy markers are compact/round; reject elongated map artifacts.
+            circ = 1.0
+            if area >= 10:
+                peri = cv2.arcLength(c, True)
+                if peri <= 0:
+                    continue
+                circ = 4.0 * math.pi * area / (peri * peri)
+                if circ < 0.45:
+                    continue
             m = cv2.moments(c)
             if m["m00"] == 0:
                 continue
             cx = rx + m["m10"] / m["m00"]
             cy = ry + m["m01"] / m["m00"]
-            # More on-target color + plausible size → higher confidence.
-            conf = max(0.45, min(0.9, 0.5 + area / (self.max_area * 2.0)))
+            # Roundness + size → confidence.
+            conf = max(0.45, min(0.95, 0.45 + 0.3 * circ + area / (self.max_area * 3.0)))
             detections.append(RawDetection("mm_enemy", round(conf, 3), (cx - 5, cy - 5, 10, 10)))
         return detections
 

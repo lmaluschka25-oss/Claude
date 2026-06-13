@@ -38,6 +38,16 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
     }
   }
 
+  async function reset() {
+    setBusy(true);
+    try {
+      setS(await api.resetCalibration());
+      setSaved(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!s) return <div className="view"><div className="panel"><div className="panel-body empty">Loading settings…</div></div></div>;
 
   const stats = intelligence?.detection_stats;
@@ -106,10 +116,23 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
             </label>
           </div>
           <div className="calib-controls">
-            <div className="sub-label">Enemy color (mask should hit ONLY enemy dots)</div>
-            <Slider s={s} set={set} k="hue_min" label="hue min" min={0} max={179} step={1} />
-            <Slider s={s} set={set} k="hue_max" label="hue max" min={0} max={179} step={1} />
-            <Slider s={s} set={set} k="sat_min" label="saturation min" min={0} max={255} step={1} />
+            <div className="sub-label">Enemy color</div>
+            <label className="slider">
+              <span>Color mode</span>
+              <select value={s.color_mode || "auto"} onChange={(e) => set("color_mode", e.target.value)}>
+                <option value="auto">Auto — detect red & yellow (no tuning)</option>
+                <option value="red">Red only</option>
+                <option value="yellow">Yellow only</option>
+                <option value="custom">Custom hue band</option>
+              </select>
+            </label>
+            {(s.color_mode || "auto") === "custom" && (
+              <>
+                <Slider s={s} set={set} k="hue_min" label="hue min" min={0} max={179} step={1} />
+                <Slider s={s} set={set} k="hue_max" label="hue max" min={0} max={179} step={1} />
+              </>
+            )}
+            <Slider s={s} set={set} k="sat_min" label="saturation min (higher = stricter)" min={0} max={255} step={1} />
             <Slider s={s} set={set} k="val_min" label="brightness min" min={0} max={255} step={1} />
             <Slider s={s} set={set} k="min_area" label="min blob size" min={1} max={40} step={1} />
             <Slider s={s} set={set} k="max_area" label="max blob size" min={40} max={800} step={10} />
@@ -144,6 +167,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
         <button className="btn primary" onClick={save} disabled={busy}>
           {busy ? "Saving…" : saved ? "✓ Saved" : "Save settings"}
         </button>
+        <button className="btn ghost" onClick={reset} disabled={busy}>Reset to defaults</button>
         {round && (
           <button className="btn" onClick={() => onReanalyze?.(round.id)}>
             Re-analyze latest round with these settings

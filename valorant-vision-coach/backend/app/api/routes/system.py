@@ -47,3 +47,9 @@ def put_calibration(
 ) -> dict:
     """Persist calibration changes (applies to future processing + previews)."""
     return calibration_store.save(settings, body.model_dump(exclude_none=True))
+
+
+@router.delete("/system/calibration")
+def reset_calibration(settings: Settings = Depends(get_settings_dep)) -> dict:
+    """Reset all detection settings to defaults (auto color, etc.)."""
+    return calibration_store.reset(settings)

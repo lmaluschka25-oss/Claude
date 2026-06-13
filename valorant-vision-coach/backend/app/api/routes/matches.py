@@ -163,6 +163,7 @@ def minimap_preview(
     val_min: int | None = None,
     hue_min: int | None = None,
     hue_max: int | None = None,
+    color_mode: str | None = None,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> Response:
@@ -196,6 +197,7 @@ def minimap_preview(
         rotation=int(s["rotation"]), flip_x=bool(s["flip_x"]),
     )
     detector = MinimapColorDetector(settings, calibration=calib)
+    detector.color_mode = color_mode or str(s.get("color_mode", "auto"))
     detector.hue_min = hue_min if hue_min is not None else int(s["hue_min"])
     detector.hue_max = hue_max if hue_max is not None else int(s["hue_max"])
     detector.sat_min = sat_min if sat_min is not None else int(s["sat_min"])

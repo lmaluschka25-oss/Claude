@@ -32,6 +32,7 @@ class CalibrationSettings(BaseModel):
     h_frac: float | None = None
     rotation: int | None = None
     flip_x: bool | None = None
+    color_mode: str | None = None
     hue_min: int | None = None
     hue_max: int | None = None
     sat_min: int | None = None
