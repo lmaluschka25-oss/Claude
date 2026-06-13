@@ -25,6 +25,27 @@ class MatchUpdate(BaseModel):
     side: Side | None = None
 
 
+class CalibrationSettings(BaseModel):
+    x_frac: float | None = None
+    y_frac: float | None = None
+    w_frac: float | None = None
+    h_frac: float | None = None
+    rotation: int | None = None
+    flip_x: bool | None = None
+    hue_min: int | None = None
+    hue_max: int | None = None
+    sat_min: int | None = None
+    val_min: int | None = None
+    min_area: float | None = None
+    max_area: float | None = None
+    analysis_interval: float | None = None
+    confidence_threshold: float | None = None
+    pattern_weight: float | None = None
+    memory_weight: float | None = None
+    recommendation_min_confidence: float | None = None
+    timeline_detail: int | None = None
+
+
 class MatchSummary(ORMModel):
     id: int
     name: str
@@ -196,12 +217,25 @@ class AnalysisLogStep(BaseModel):
     status: str = "done"  # done | skipped | warning
 
 
+class DetectionStats(BaseModel):
+    """Feedback on whether the current detection settings are working."""
+
+    detector_backend: str
+    analysis_interval: float
+    frames_analyzed: int
+    enemy_markers: int
+    avg_confidence: float
+    status: str  # ok | low | none
+    message: str
+
+
 class MatchIntelligence(BaseModel):
     """Everything the analysis dashboard needs for the selected match."""
 
     match: MatchSummary
     current_round: RoundOut | None
     detected_info: DetectedInfo | None
+    detection_stats: DetectionStats | None
     minimap_markers: list[MarkerOut]
     utilities: list[UtilityOut]
     timeline: list[TimelineEvent]

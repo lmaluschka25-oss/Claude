@@ -26,6 +26,10 @@ function jsonBody(body) {
 export const api = {
   base: BASE,
   systemInfo: () => req("/system/info"),
+  getCalibration: () => req("/system/calibration"),
+  saveCalibration: (body) =>
+    req("/system/calibration", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+  reanalyzeRound: (id) => req(`/rounds/${id}/reanalyze`, { method: "POST" }),
   listMaps: () => req("/maps"),
   getMap: (name) => req(`/maps/${name}`),
 

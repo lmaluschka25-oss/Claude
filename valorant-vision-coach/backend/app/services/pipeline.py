@@ -26,10 +26,12 @@ from ..models import (
     UtilityDetection,
     UtilityKind,
 )
-from ..vision.detector import MockDetector, build_detector
+from ..vision.calibration import DEFAULT_CALIBRATION
+from ..vision.detector import MinimapColorDetector, MockDetector, build_detector
 from ..vision.maps import list_maps, load_map
 from ..vision.ocr import OcrEngine
 from ..vision.video_processor import ProcessOutput, VideoProcessor
+from . import calibration_store
 
 logger = get_logger(__name__)
 
@@ -76,6 +78,7 @@ def run(round_id: int, settings: Settings | None = None) -> None:
         match_side = match.side
 
     try:
+        video_path = _normalize_video(video_path)
         detector = _get_detector(cfg.detector_backend)
         ocr = _get_ocr(cfg.ocr_backend)
         game_map = load_map(map_name) if map_name else None
@@ -83,8 +86,17 @@ def run(round_id: int, settings: Settings | None = None) -> None:
         if isinstance(detector, MockDetector):
             detector.set_round(round_number)
             metadata = detector.round_metadata(round_number)
+            calib = DEFAULT_CALIBRATION  # mock emits markers at the default ROI
+        else:
+            if isinstance(detector, MinimapColorDetector):
+                calibration_store.apply_to_detector(detector, cfg)
+            calib = calibration_store.calibration(cfg)
+        store = calibration_store.load(cfg)
+        interval = float(store.get("analysis_interval", 0.5))
+        conf_threshold = float(store.get("confidence_threshold", 0.0))
         processor = VideoProcessor(
-            cfg, detector, ocr=ocr, game_map=game_map, calibration=cfg.minimap_calibration()
+            cfg, detector, ocr=ocr, game_map=game_map, calibration=calib,
+            analysis_interval=interval,
         )
 
         def progress_cb(fraction: float, detail: str) -> None:
@@ -95,7 +107,12 @@ def run(round_id: int, settings: Settings | None = None) -> None:
                     r.status_detail = detail
 
         output = processor.process(video_path, progress_cb=progress_cb)
-        _persist(round_id, output, map_name, match_side, metadata, game_map)
+        if conf_threshold > 0:
+            output.detections = [
+                d for d in output.detections
+                if d.team != Team.ENEMY or d.confidence >= conf_threshold
+            ]
+        _persist(round_id, output, map_name, match_side, metadata, game_map, video_path)
         logger.info("Finished round %s", round_id)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Processing failed for round %s: %s", round_id, exc)
@@ -104,6 +121,38 @@ def run(round_id: int, settings: Settings | None = None) -> None:
             if r is not None:
                 r.status = ProcessingStatus.FAILED
                 r.status_detail = str(exc)[:1000]
+
+
+def _normalize_video(path: str) -> str:
+    """Transcode browser/webm recordings to a seekable mp4 (fixes wrong duration
+    and broken seeking). No-op for mp4 or when ffmpeg is unavailable."""
+    import os
+    import shutil
+    import subprocess
+
+    if path.lower().endswith(".mp4"):
+        return path
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        logger.warning("ffmpeg not found — cannot normalize %s; seeking may be off.", path)
+        return path
+    out = os.path.splitext(path)[0] + ".norm.mp4"
+    try:
+        subprocess.run(
+            [ffmpeg, "-y", "-i", path, "-c:v", "libx264", "-preset", "veryfast",
+             "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", out],
+            check=True, capture_output=True, timeout=900,
+        )
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            logger.info("Normalized recording → %s", out)
+            return out
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("ffmpeg normalize failed (%s); using original.", exc)
+    return path
 
 
 def _committed_site(output: ProcessOutput, game_map) -> str | None:
@@ -121,13 +170,24 @@ def _committed_site(output: ProcessOutput, game_map) -> str | None:
     return scores.most_common(1)[0][0] if scores else None
 
 
-def _persist(round_id, output: ProcessOutput, map_name, match_side, metadata, game_map) -> None:
+def _persist(
+    round_id, output: ProcessOutput, map_name, match_side, metadata, game_map, video_path
+) -> None:
+    from ..models import Detection as _Det
+    from ..models import KillfeedEvent as _Kf
+    from ..models import UtilityDetection as _Ut
+
     with session_scope() as session:
         rnd = session.get(Round, round_id)
         if rnd is None:
             return
         match_id = rnd.match_id
 
+        # Idempotent: clear any prior results so re-analysis doesn't duplicate.
+        for model in (_Det, _Ut, _Kf):
+            session.query(model).filter(model.round_id == round_id).delete()
+
+        rnd.stored_path = video_path
         rnd.duration_seconds = output.duration_seconds
         rnd.fps = output.fps
         rnd.frame_count = output.frame_count

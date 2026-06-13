@@ -73,10 +73,19 @@ class Settings(BaseSettings):
     # Settings tab with the color mask until only enemy dots light up.
     minimap_enemy_hue_min: int = 18
     minimap_enemy_hue_max: int = 45
-    minimap_enemy_sat_min: int = 90
-    minimap_enemy_val_min: int = 120
-    minimap_min_area: float = 3.0
-    minimap_max_area: float = 600.0
+    minimap_enemy_sat_min: int = 160
+    minimap_enemy_val_min: int = 150
+    minimap_min_area: float = 4.0
+    minimap_max_area: float = 260.0
+
+    # ---- Advanced detection / analysis settings (user-tunable, persisted) ---
+    # Each maps to a real parameter and measurably changes analysis output.
+    analysis_interval: float = 0.5  # seconds between analyzed frames
+    confidence_threshold: float = 0.0  # drop enemy detections below this
+    pattern_weight: float = 0.34  # momentum weight in next-round prediction
+    memory_weight: float = 0.34  # base-rate (whole-match) weight in prediction
+    recommendation_min_confidence: float = 0.0  # below → "need more data"
+    timeline_detail: int = 12  # max timeline events shown
 
     # ---- Analysis defaults ----------------------------------------------
     # A sighting older than this (seconds) is considered stale and dropped

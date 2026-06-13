@@ -90,6 +90,14 @@ export default function App() {
     setRoundId(r.id);
     if (r.status === "completed") loadMatch(matchId, r.id);
   }
+  async function reanalyze(roundId) {
+    try {
+      await api.reanalyzeRound(roundId);
+      if (matchId != null) loadMatch(matchId, roundId);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
   async function updateSide(side) {
     if (matchId == null) return;
     try {
@@ -120,7 +128,11 @@ export default function App() {
         />
       )}
       {tab === "LEARNINGS" && <LearningsView intelligence={intel} mapMeta={mapMeta} />}
-      {tab === "SETTINGS" && <SettingsView info={info} calibrationRound={calibrationRound} />}
+      {tab === "SETTINGS" && (
+        <SettingsView
+          info={info} intelligence={intel} calibrationRound={calibrationRound} onReanalyze={reanalyze}
+        />
+      )}
 
       {tab === "ANALYSIS" && (
         <div className="analysis">

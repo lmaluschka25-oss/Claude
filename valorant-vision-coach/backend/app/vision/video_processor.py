@@ -80,12 +80,14 @@ class VideoProcessor:
         ocr: OcrEngine | None = None,
         game_map: GameMap | None = None,
         calibration: MinimapCalibration | None = None,
+        analysis_interval: float | None = None,
     ) -> None:
         self.settings = settings
         self.detector = detector
         self.ocr = ocr
         self.game_map = game_map
         self.calibration = calibration or DEFAULT_CALIBRATION
+        self.analysis_interval = analysis_interval
 
     def _callout(self, x: float | None, y: float | None) -> str | None:
         if self.game_map is None or x is None:
@@ -105,7 +107,10 @@ class VideoProcessor:
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         duration = frame_count / fps if fps else 0.0
-        stride = max(1, self.settings.frame_sample_stride)
+        if self.analysis_interval and self.analysis_interval > 0 and fps:
+            stride = max(1, round(self.analysis_interval * fps))
+        else:
+            stride = max(1, self.settings.frame_sample_stride)
         max_frames = self.settings.max_frames or float("inf")
 
         out = ProcessOutput(duration_seconds=duration, fps=fps, frame_count=frame_count)
@@ -168,6 +173,13 @@ class VideoProcessor:
                     break
         finally:
             cap.release()
+
+        # webm/streamed files often report a wrong frame count — derive the real
+        # duration from the frames we actually iterated.
+        total = frame_idx + 1
+        if total > 0 and fps:
+            out.frame_count = total
+            out.duration_seconds = round(total / fps, 3)
 
         logger.info(
             "Processed %s frames: %s detections, %s utilities, %s killfeed.",

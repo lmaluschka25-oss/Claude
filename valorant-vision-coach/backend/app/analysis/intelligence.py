@@ -22,6 +22,7 @@ from ..schemas import (
     AnalysisLogStep,
     DetectedInfo,
     DetectedPositionLive,
+    DetectionStats,
     EnemyProfile,
     HeatCell,
     MarkerOut,
@@ -92,8 +93,14 @@ def _agent_round_site(detections: list[Detection], game_map: GameMap | None) -> 
     return {a: c.most_common(1)[0][0] for a, c in per_agent.items() if c}
 
 
-def _predict(sequence: list[str], sites: list[str]) -> dict[str, float]:
-    """Blend base rate, momentum and a Markov step into a site distribution."""
+def _predict(
+    sequence: list[str], sites: list[str],
+    w_base: float = _W_BASE, w_momentum: float = _W_MOMENTUM, w_transition: float = _W_TRANSITION,
+) -> dict[str, float]:
+    """Blend base rate, momentum and a Markov step into a site distribution.
+
+    ``w_base`` = match-memory weight, ``w_momentum`` = recent-pattern weight.
+    """
     if not sequence:
         return {s: round(1.0 / len(sites), 3) for s in sites}
     n = len(sequence)
@@ -118,7 +125,7 @@ def _predict(sequence: list[str], sites: list[str]) -> dict[str, float]:
     else:
         markov = dict(base)
     blended = {
-        s: _W_BASE * base[s] + _W_MOMENTUM * momentum[s] + _W_TRANSITION * markov[s] for s in sites
+        s: w_base * base[s] + w_momentum * momentum[s] + w_transition * markov[s] for s in sites
     }
     total = sum(blended.values()) or 1.0
     return {s: round(blended[s] / total, 3) for s in sites}
@@ -196,7 +203,16 @@ def build_match_intelligence(
         s: round(presence_counts.get(s, 0) / rounds_analyzed, 3) if rounds_analyzed else 0.0
         for s in sites
     }
-    prob_map = _predict(site_sequence, sites)
+    from ..services import calibration_store
+
+    store = calibration_store.load(settings)
+    mem_w = float(store["memory_weight"])
+    pat_w = float(store["pattern_weight"])
+    trans_w = max(0.05, 1.0 - mem_w - pat_w)
+    rec_min = float(store["recommendation_min_confidence"])
+    timeline_detail = int(store["timeline_detail"])
+
+    prob_map = _predict(site_sequence, sites, mem_w, pat_w, trans_w)
     position_probabilities = sorted(
         (PositionProbability(site=s, probability=p) for s, p in prob_map.items()),
         key=lambda x: x.probability, reverse=True,
@@ -208,15 +224,23 @@ def build_match_intelligence(
     recommendation = _recommendation(
         site_presence, prob_map, sites, conf, conf_label, agent_site_counts, next_side
     )
+    if recommendation.confidence < rec_min:
+        recommendation.best_site = None
+        recommendation.reasons = [
+            f"Confidence {round(conf * 100)}% is below your threshold "
+            f"({round(rec_min * 100)}%) — analyze more rounds first."
+        ]
+        recommendation.suggested_play = []
     learnings = _learnings(rounds_analyzed, site_presence, agent_site_counts, recommendation)
 
     intel = MatchIntelligence(
         match=summary,
         current_round=RoundOut.model_validate(current) if current else None,
         detected_info=_detected_info(current, match, game_map),
+        detection_stats=_detection_stats(current, settings, store),
         minimap_markers=_markers(current, game_map),
         utilities=[UtilityOut.model_validate(u) for u in (current.utilities if current else [])],
-        timeline=_timeline(current),
+        timeline=_timeline(current, timeline_detail),
         detected_positions=_live_positions(current),
         position_probabilities=position_probabilities,
         patterns=patterns,
@@ -322,7 +346,36 @@ def _markers(current: Round | None, game_map) -> list[MarkerOut]:
     return markers
 
 
-def _timeline(current: Round | None) -> list[TimelineEvent]:
+def _detection_stats(current: Round | None, settings, store: dict) -> DetectionStats:
+    backend = settings.detector_backend
+    interval = float(store.get("analysis_interval", 0.5))
+    if current is None:
+        return DetectionStats(
+            detector_backend=backend, analysis_interval=interval, frames_analyzed=0,
+            enemy_markers=0, avg_confidence=0.0, status="none",
+            message="No round analyzed yet.")
+    enemy = [d for d in current.detections if d.team == Team.ENEMY]
+    n = len(enemy)
+    avg = round(sum(d.confidence for d in enemy) / n, 3) if n else 0.0
+    frames = current.frame_count or 0
+    if n == 0:
+        status, msg = "none", (
+            "No enemy markers detected. If enemies WERE revealed, the color band or "
+            "minimap box is off — tune them below (lower Sat/Val to detect more)."
+        )
+    elif n < 3:
+        status, msg = "low", (
+            f"Only {n} enemy markers across the round. Lower the confidence threshold "
+            "or widen the color band if enemies were missed."
+        )
+    else:
+        status, msg = "ok", f"{n} enemy markers detected — detection is working."
+    return DetectionStats(
+        detector_backend=backend, analysis_interval=interval, frames_analyzed=frames,
+        enemy_markers=n, avg_confidence=avg, status=status, message=msg)
+
+
+def _timeline(current: Round | None, limit: int = 12) -> list[TimelineEvent]:
     if current is None:
         return []
     events: list[TimelineEvent] = []
@@ -343,7 +396,7 @@ def _timeline(current: Round | None) -> list[TimelineEvent]:
                                     label=f"Kill {k.victim or ''}".strip(),
                                     detail=f"{k.killer or '?'} → {k.victim or '?'}"))
     events.sort(key=lambda e: e.timestamp_seconds)
-    return events[:12]
+    return events[: max(1, limit)]
 
 
 def _live_positions(current: Round | None) -> list[DetectedPositionLive]:

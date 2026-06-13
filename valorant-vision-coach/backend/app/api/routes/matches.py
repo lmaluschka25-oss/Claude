@@ -154,6 +154,7 @@ def minimap_preview(
     round_id: int,
     t: float = 0.0,
     mask: bool = False,
+    crop: bool = False,
     x_frac: float | None = None,
     y_frac: float | None = None,
     w_frac: float | None = None,
@@ -165,10 +166,15 @@ def minimap_preview(
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> Response:
-    """A frame with the minimap ROI box + detected enemy dots (for calibration)."""
+    """A frame with the minimap ROI box + detected enemy dots (for calibration).
+
+    Defaults to the SAVED calibration; query params override it live for tuning.
+    ``crop=1`` returns just the zoomed minimap region.
+    """
     rnd = _require_round(session, round_id)
     import cv2
 
+    from ...services import calibration_store
     from ...vision.calibration import MinimapCalibration
     from ...vision.detector import MinimapColorDetector
 
@@ -181,21 +187,21 @@ def minimap_preview(
     if not ok or frame is None:
         raise HTTPException(status_code=404, detail="Frame not readable here.")
 
-    calib = settings.minimap_calibration()
-    if None not in (x_frac, y_frac, w_frac, h_frac):
-        calib = MinimapCalibration(
-            x_frac=x_frac, y_frac=y_frac, w_frac=w_frac, h_frac=h_frac,
-            rotation=settings.minimap_rotation, flip_x=settings.minimap_flip_x,
-        )
+    s = calibration_store.load(settings)  # saved settings as the base
+    calib = MinimapCalibration(
+        x_frac=x_frac if x_frac is not None else s["x_frac"],
+        y_frac=y_frac if y_frac is not None else s["y_frac"],
+        w_frac=w_frac if w_frac is not None else s["w_frac"],
+        h_frac=h_frac if h_frac is not None else s["h_frac"],
+        rotation=int(s["rotation"]), flip_x=bool(s["flip_x"]),
+    )
     detector = MinimapColorDetector(settings, calibration=calib)
-    if sat_min is not None:
-        detector.sat_min = sat_min
-    if val_min is not None:
-        detector.val_min = val_min
-    if hue_min is not None:
-        detector.hue_min = hue_min
-    if hue_max is not None:
-        detector.hue_max = hue_max
+    detector.hue_min = hue_min if hue_min is not None else int(s["hue_min"])
+    detector.hue_max = hue_max if hue_max is not None else int(s["hue_max"])
+    detector.sat_min = sat_min if sat_min is not None else int(s["sat_min"])
+    detector.val_min = val_min if val_min is not None else int(s["val_min"])
+    detector.min_area = float(s["min_area"])
+    detector.max_area = float(s["max_area"])
 
     if mask:
         frame = detector.mask_overlay(frame)
@@ -205,14 +211,38 @@ def minimap_preview(
     cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
     for d in dets:
         cx, cy = d.center
-        cv2.circle(frame, (int(cx), int(cy)), 9, (0, 0, 255), 2)
+        cv2.circle(frame, (int(cx), int(cy)), 8, (0, 0, 255), 2)
     cv2.putText(frame, f"enemies: {len(dets)}", (rx, max(ry - 8, 14)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+    if crop and rw > 0 and rh > 0:
+        pad = 6
+        y0, y1 = max(ry - pad, 0), min(ry + rh + pad, fh)
+        x0, x1 = max(rx - pad, 0), min(rx + rw + pad, fw)
+        sub = frame[y0:y1, x0:x1]
+        if sub.size and sub.shape[1] > 0:
+            scale = 360.0 / sub.shape[1]
+            frame = cv2.resize(sub, (360, max(1, int(sub.shape[0] * scale))))
 
     ok, buf = cv2.imencode(".png", frame)
     if not ok:
         raise HTTPException(status_code=500, detail="PNG encoding failed.")
     return Response(content=buf.tobytes(), media_type="image/png")
+
+
+@rounds_router.post("/{round_id}/reanalyze", response_model=RoundOut, status_code=202)
+def reanalyze_round(round_id: int, session: Session = Depends(get_session)) -> RoundOut:
+    """Re-run analysis for a round with the current saved calibration."""
+    from ...models import ProcessingStatus
+
+    rnd = _require_round(session, round_id)
+    rnd.status = ProcessingStatus.PENDING
+    rnd.status_detail = "Queued for re-analysis"
+    rnd.progress = 0.0
+    session.commit()
+    session.refresh(rnd)
+    pipeline.submit(rnd.id)
+    return RoundOut.model_validate(rnd)
 
 
 @rounds_router.get("/{round_id}/video")
