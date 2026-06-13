@@ -126,6 +126,7 @@ def get_killfeed(match_id: int, session: Session = Depends(get_session)) -> list
 def minimap_preview(
     match_id: int,
     t: float = 0.0,
+    mask: bool = False,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> Response:
@@ -133,7 +134,8 @@ def minimap_preview(
 
     Use this to calibrate: the green box should sit exactly on the minimap and
     the red circles on the enemy markers. Adjust the VVC_MINIMAP_* settings until
-    it lines up.
+    it lines up. Add ``?mask=1`` to tint (cyan) every pixel the red-color gate
+    matches — handy for tuning the color thresholds.
     """
     match = _require_match(session, match_id)
     import cv2  # lazy heavy import
@@ -149,9 +151,12 @@ def minimap_preview(
     if not ok or frame is None:
         raise HTTPException(status_code=404, detail="Frame an dieser Stelle nicht lesbar.")
 
+    detector = MinimapColorDetector(settings)
+    if mask:
+        frame = detector.mask_overlay(frame)
+
     h, w = frame.shape[:2]
     rx, ry, rw, rh = settings.minimap_calibration().roi_pixels(w, h)
-    detector = MinimapColorDetector(settings)
     dets = detector.find_enemies(frame)
 
     cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)

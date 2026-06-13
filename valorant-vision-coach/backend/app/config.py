@@ -68,10 +68,15 @@ class Settings(BaseSettings):
     minimap_rotation: int = 0
     minimap_flip_x: bool = False
     # Red enemy-marker color gate (HSV) and blob-area bounds (pixels).
-    minimap_enemy_sat_min: int = 110
-    minimap_enemy_val_min: int = 90
+    # Strict by default: only bright, saturated, pure red passes — so warm
+    # background textures (a translucent big map over the world) are rejected.
+    # Hue wraps: pixels with hue <= hue_lo OR >= hue_hi count as red.
+    minimap_enemy_sat_min: int = 150
+    minimap_enemy_val_min: int = 150
+    minimap_enemy_hue_lo: int = 6
+    minimap_enemy_hue_hi: int = 174
     minimap_min_area: float = 3.0
-    minimap_max_area: float = 900.0
+    minimap_max_area: float = 600.0
 
     # ---- Analysis defaults ----------------------------------------------
     # A sighting older than this (seconds) is considered stale and dropped

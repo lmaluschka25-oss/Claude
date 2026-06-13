@@ -253,29 +253,39 @@ class MinimapColorDetector(BaseDetector):
         self.calibration = settings.minimap_calibration()
         self.sat_min = settings.minimap_enemy_sat_min
         self.val_min = settings.minimap_enemy_val_min
+        self.hue_lo = settings.minimap_enemy_hue_lo
+        self.hue_hi = settings.minimap_enemy_hue_hi
         self.min_area = settings.minimap_min_area
         self.max_area = settings.minimap_max_area
 
-    def find_enemies(self, frame: np.ndarray) -> list[RawDetection]:
-        """Return enemy-marker detections (also used by the calibration preview)."""
+    def _roi_mask(self, frame: np.ndarray):
+        """Return the minimap ROI box and the binary red-marker mask within it."""
         import cv2
 
         h, w = frame.shape[:2]
         rx, ry, rw, rh = self.calibration.roi_pixels(w, h)
         roi = frame[ry : ry + rh, rx : rx + rw]
         if roi.size == 0:
-            return []
+            return rx, ry, rw, rh, None
 
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
         lower1 = np.array([0, self.sat_min, self.val_min])
-        upper1 = np.array([10, 255, 255])
-        lower2 = np.array([168, self.sat_min, self.val_min])
+        upper1 = np.array([self.hue_lo, 255, 255])
+        lower2 = np.array([self.hue_hi, self.sat_min, self.val_min])
         upper2 = np.array([179, 255, 255])
         mask = cv2.inRange(hsv, lower1, upper1) | cv2.inRange(hsv, lower2, upper2)
         kernel = np.ones((2, 2), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        return rx, ry, rw, rh, mask
 
+    def find_enemies(self, frame: np.ndarray) -> list[RawDetection]:
+        """Return enemy-marker detections (also used by the calibration preview)."""
+        import cv2
+
+        rx, ry, _, _, mask = self._roi_mask(frame)
+        if mask is None:
+            return []
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         detections: list[RawDetection] = []
         for c in contours:
@@ -291,6 +301,15 @@ class MinimapColorDetector(BaseDetector):
             conf = max(0.45, min(0.9, 0.5 + area / (self.max_area * 2.0)))
             detections.append(RawDetection("mm_enemy", round(conf, 3), (cx - 5, cy - 5, 10, 10)))
         return detections
+
+    def mask_overlay(self, frame: np.ndarray) -> np.ndarray:
+        """Return a copy of the frame with color-matched pixels tinted cyan."""
+        rx, ry, rw, rh, mask = self._roi_mask(frame)
+        out = frame.copy()
+        if mask is not None:
+            region = out[ry : ry + rh, rx : rx + rw]
+            region[mask > 0] = (255, 255, 0)
+        return out
 
     def detect(self, frame: np.ndarray, frame_index: int, timestamp: float) -> list[RawDetection]:
         return self.find_enemies(frame)
