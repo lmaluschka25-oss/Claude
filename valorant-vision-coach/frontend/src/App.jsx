@@ -3,6 +3,7 @@ import { api } from "./api/client.js";
 import MatchUpload from "./components/MatchUpload.jsx";
 import MatchList from "./components/MatchList.jsx";
 import PredictionCard from "./components/PredictionCard.jsx";
+import TrackingReview from "./components/TrackingReview.jsx";
 
 export default function App() {
   const [info, setInfo] = useState(null);
@@ -148,7 +149,12 @@ export default function App() {
             </div>
           )}
 
-          {ready && <PredictionCard prediction={prediction} mapMeta={mapMeta} />}
+          {ready && (
+            <>
+              <PredictionCard prediction={prediction} mapMeta={mapMeta} />
+              <TrackingReview matchId={detail.id} duration={detail.duration_seconds} />
+            </>
+          )}
         </main>
       </div>
     </div>

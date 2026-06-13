@@ -40,6 +40,8 @@ export const api = {
   },
   getTendencies: (id) => req(`/matches/${id}/analysis/tendencies`),
   getPrediction: (id) => req(`/matches/${id}/analysis/prediction`),
+  minimapPreviewUrl: (id, t, mask = false) =>
+    `${BASE}/matches/${id}/minimap-preview?t=${t}${mask ? "&mask=1" : ""}`,
 
   // Upload with progress via XHR (fetch lacks upload progress events).
   uploadMatch(file, mapName, onProgress) {

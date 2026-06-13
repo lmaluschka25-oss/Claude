@@ -627,3 +627,15 @@ select {
   font-size: 11px;
   padding: 0 5px;
 }
+
+/* ---- Tracking review ---- */
+.track-img {
+  width: 100%;
+  background: #0e1420;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.track-img img {
+  width: 100%;
+  display: block;
+}
