@@ -1,0 +1,23 @@
+# --- AI Vision Dashboard – Abhängigkeiten ---
+# Screen Capture
+mss>=9.0.1
+pillow>=10.0.0
+numpy>=1.24.0
+
+# OCR
+pytesseract>=0.3.10
+
+# Windows App-/Fenster-Erkennung (nur unter Windows installiert)
+pywin32>=306 ; platform_system == "Windows"
+psutil>=5.9.0
+
+# AI Layer (Claude)
+anthropic>=0.40.0
+
+# Dashboard
+streamlit>=1.36.0
+streamlit-autorefresh>=1.0.1
+pandas>=2.0.0
+
+# Konfiguration
+python-dotenv>=1.0.0
