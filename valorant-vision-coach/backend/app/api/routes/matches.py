@@ -1,19 +1,23 @@
-"""Match upload, listing, status, and derived-data endpoints."""
+"""Match management, round uploads, intelligence, and media endpoints."""
 from __future__ import annotations
 
+import os
+import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from sqlalchemy.orm import Session
+from starlette.responses import StreamingResponse
 
+from ...analysis.intelligence import build_match_intelligence
 from ...config import Settings
 from ...logging_config import get_logger
-from ...models import DetectionSource, Team
 from ...schemas import (
     DetectionOut,
-    KillfeedOut,
+    MatchCreate,
     MatchDetail,
+    MatchIntelligence,
     MatchSummary,
     RoundOut,
 )
@@ -22,32 +26,61 @@ from ..deps import get_session, get_settings_dep
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/matches", tags=["matches"])
+rounds_router = APIRouter(prefix="/rounds", tags=["rounds"])
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
-CHUNK = 1024 * 1024  # 1 MiB
+CHUNK = 1024 * 1024
+_VIDEO_MIME = {
+    ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+    ".mkv": "video/x-matroska", ".avi": "video/x-msvideo",
+}
 
 
+# ---- Matches -------------------------------------------------------------
 @router.get("", response_model=list[MatchSummary])
 def list_matches(session: Session = Depends(get_session)) -> list[MatchSummary]:
-    return [MatchSummary.model_validate(m) for m in match_service.list_matches(session)]
+    return [match_service.to_summary(m) for m in match_service.list_matches(session)]
 
 
 @router.post("", response_model=MatchDetail, status_code=201)
-async def upload_match(
+def create_match(body: MatchCreate, session: Session = Depends(get_session)) -> MatchDetail:
+    match = match_service.create_match(
+        session, name=body.name, map_name=body.map_name, side=body.side
+    )
+    return _detail(match)
+
+
+@router.get("/{match_id}", response_model=MatchDetail)
+def get_match(match_id: int, session: Session = Depends(get_session)) -> MatchDetail:
+    return _detail(_require_match(session, match_id))
+
+
+@router.delete("/{match_id}", status_code=204, response_model=None)
+def delete_match(match_id: int, session: Session = Depends(get_session)) -> Response:
+    match_service.delete_match(session, _require_match(session, match_id))
+    return Response(status_code=204)
+
+
+@router.get("/{match_id}/rounds", response_model=list[RoundOut])
+def list_rounds(match_id: int, session: Session = Depends(get_session)) -> list[RoundOut]:
+    match = _require_match(session, match_id)
+    return [RoundOut.model_validate(r) for r in match.rounds]
+
+
+@router.post("/{match_id}/rounds", response_model=RoundOut, status_code=201)
+async def upload_round(
+    match_id: int,
     file: UploadFile = File(...),
     map_name: str | None = Form(default=None),
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
-) -> MatchDetail:
+) -> RoundOut:
+    match = _require_match(session, match_id)
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type {suffix!r}. Allowed: {sorted(ALLOWED_EXTENSIONS)}",
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported file type {suffix!r}.")
 
-    stored_name = f"{uuid.uuid4().hex}{suffix}"
-    stored_path = settings.upload_dir / stored_name
+    stored_path = settings.upload_dir / f"{uuid.uuid4().hex}{suffix}"
     max_bytes = settings.max_upload_mb * 1024 * 1024
     written = 0
     try:
@@ -57,125 +90,180 @@ async def upload_match(
                 if written > max_bytes:
                     out.close()
                     stored_path.unlink(missing_ok=True)
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"File exceeds limit of {settings.max_upload_mb} MB.",
-                    )
+                    raise HTTPException(status_code=413, detail="File too large.")
                 out.write(chunk)
     finally:
         await file.close()
 
-    match = match_service.create_match(
+    rnd = match_service.create_round(
         session,
-        filename=file.filename or stored_name,
+        match_id=match.id,
+        filename=file.filename or stored_path.name,
         stored_path=str(stored_path),
-        map_name=map_name,
+        map_name=(map_name or match.map_name),
     )
-    pipeline.submit(match.id)
-    logger.info("Queued match %s (%s, %.1f MB)", match.id, match.filename, written / 1e6)
-    return MatchDetail.model_validate(match)
+    pipeline.submit(rnd.id)
+    logger.info("Queued round %s for match %s (%s)", rnd.round_number, match.id, rnd.filename)
+    return RoundOut.model_validate(rnd)
 
 
-@router.get("/{match_id}", response_model=MatchDetail)
-def get_match(match_id: int, session: Session = Depends(get_session)) -> MatchDetail:
-    match = match_service.get_match(session, match_id)
-    if match is None:
-        raise HTTPException(status_code=404, detail="Match not found")
-    return MatchDetail.model_validate(match)
+@router.get("/{match_id}/intelligence", response_model=MatchIntelligence)
+def intelligence(
+    match_id: int,
+    round_id: int | None = None,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+) -> MatchIntelligence:
+    return build_match_intelligence(
+        session, _require_match(session, match_id), settings, round_id=round_id
+    )
 
 
-@router.delete("/{match_id}", status_code=204, response_model=None)
-def delete_match(match_id: int, session: Session = Depends(get_session)) -> Response:
-    match = match_service.get_match(session, match_id)
-    if match is None:
-        raise HTTPException(status_code=404, detail="Match not found")
-    match_service.delete_match(session, match)
+# ---- Rounds --------------------------------------------------------------
+@rounds_router.get("/{round_id}", response_model=RoundOut)
+def get_round(round_id: int, session: Session = Depends(get_session)) -> RoundOut:
+    return RoundOut.model_validate(_require_round(session, round_id))
+
+
+@rounds_router.delete("/{round_id}", status_code=204, response_model=None)
+def delete_round(round_id: int, session: Session = Depends(get_session)) -> Response:
+    match_service.delete_round(session, _require_round(session, round_id))
     return Response(status_code=204)
 
 
-@router.get("/{match_id}/rounds", response_model=list[RoundOut])
-def get_rounds(match_id: int, session: Session = Depends(get_session)) -> list[RoundOut]:
-    _require_match(session, match_id)
-    return [RoundOut.model_validate(r) for r in match_service.get_rounds(session, match_id)]
+@rounds_router.get("/{round_id}/detections", response_model=list[DetectionOut])
+def round_detections(round_id: int, session: Session = Depends(get_session)) -> list[DetectionOut]:
+    _require_round(session, round_id)
+    return [DetectionOut.model_validate(d) for d in match_service.get_detections(session, round_id)]
 
 
-@router.get("/{match_id}/detections", response_model=list[DetectionOut])
-def get_detections(
-    match_id: int,
-    start: float | None = None,
-    end: float | None = None,
-    team: Team | None = None,
-    source: DetectionSource | None = None,
-    limit: int = 5000,
-    session: Session = Depends(get_session),
-) -> list[DetectionOut]:
-    _require_match(session, match_id)
-    rows = match_service.get_detections(
-        session, match_id, start=start, end=end, team=team, source=source, limit=limit
-    )
-    return [DetectionOut.model_validate(d) for d in rows]
-
-
-@router.get("/{match_id}/killfeed", response_model=list[KillfeedOut])
-def get_killfeed(match_id: int, session: Session = Depends(get_session)) -> list[KillfeedOut]:
-    _require_match(session, match_id)
-    return [KillfeedOut.model_validate(k) for k in match_service.get_killfeed(session, match_id)]
-
-
-@router.get("/{match_id}/minimap-preview")
+@rounds_router.get("/{round_id}/minimap-preview")
 def minimap_preview(
-    match_id: int,
+    round_id: int,
     t: float = 0.0,
     mask: bool = False,
+    x_frac: float | None = None,
+    y_frac: float | None = None,
+    w_frac: float | None = None,
+    h_frac: float | None = None,
+    sat_min: int | None = None,
+    val_min: int | None = None,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> Response:
-    """Return a PNG of one frame with the minimap ROI box + detected enemy dots.
+    """A frame with the minimap ROI box + detected enemy dots (for calibration)."""
+    rnd = _require_round(session, round_id)
+    import cv2
 
-    Use this to calibrate: the green box should sit exactly on the minimap and
-    the red circles on the enemy markers. Adjust the VVC_MINIMAP_* settings until
-    it lines up. Add ``?mask=1`` to tint (cyan) every pixel the red-color gate
-    matches — handy for tuning the color thresholds.
-    """
-    match = _require_match(session, match_id)
-    import cv2  # lazy heavy import
-
+    from ...vision.calibration import MinimapCalibration
     from ...vision.detector import MinimapColorDetector
 
-    cap = cv2.VideoCapture(match.stored_path)
+    cap = cv2.VideoCapture(rnd.stored_path)
     if not cap.isOpened():
-        raise HTTPException(status_code=500, detail="Video konnte nicht geöffnet werden.")
+        raise HTTPException(status_code=500, detail="Could not open video.")
     cap.set(cv2.CAP_PROP_POS_MSEC, max(t, 0.0) * 1000.0)
     ok, frame = cap.read()
     cap.release()
     if not ok or frame is None:
-        raise HTTPException(status_code=404, detail="Frame an dieser Stelle nicht lesbar.")
+        raise HTTPException(status_code=404, detail="Frame not readable here.")
 
-    detector = MinimapColorDetector(settings)
+    calib = settings.minimap_calibration()
+    if None not in (x_frac, y_frac, w_frac, h_frac):
+        calib = MinimapCalibration(
+            x_frac=x_frac, y_frac=y_frac, w_frac=w_frac, h_frac=h_frac,
+            rotation=settings.minimap_rotation, flip_x=settings.minimap_flip_x,
+        )
+    detector = MinimapColorDetector(settings, calibration=calib)
+    if sat_min is not None:
+        detector.sat_min = sat_min
+    if val_min is not None:
+        detector.val_min = val_min
+
     if mask:
         frame = detector.mask_overlay(frame)
-
-    h, w = frame.shape[:2]
-    rx, ry, rw, rh = settings.minimap_calibration().roi_pixels(w, h)
+    fh, fw = frame.shape[:2]
+    rx, ry, rw, rh = calib.roi_pixels(fw, fh)
     dets = detector.find_enemies(frame)
-
     cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
     for d in dets:
         cx, cy = d.center
         cv2.circle(frame, (int(cx), int(cy)), 9, (0, 0, 255), 2)
-    cv2.putText(
-        frame, f"enemies: {len(dets)}", (rx, max(ry - 8, 14)),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2,
-    )
+    cv2.putText(frame, f"enemies: {len(dets)}", (rx, max(ry - 8, 14)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
     ok, buf = cv2.imencode(".png", frame)
     if not ok:
-        raise HTTPException(status_code=500, detail="PNG-Encoding fehlgeschlagen.")
+        raise HTTPException(status_code=500, detail="PNG encoding failed.")
     return Response(content=buf.tobytes(), media_type="image/png")
 
 
+@rounds_router.get("/{round_id}/video")
+def round_video(
+    round_id: int, request: Request, session: Session = Depends(get_session)
+) -> Response:
+    """Stream the stored recording, with HTTP range support for <video>."""
+    rnd = _require_round(session, round_id)
+    path = rnd.stored_path
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Recording not found.")
+    file_size = os.path.getsize(path)
+    media = _VIDEO_MIME.get(Path(path).suffix.lower(), "application/octet-stream")
+    range_header = request.headers.get("range")
+
+    if range_header:
+        m = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        start = int(m.group(1)) if m else 0
+        end = int(m.group(2)) if (m and m.group(2)) else file_size - 1
+        end = min(end, file_size - 1)
+        length = end - start + 1
+
+        def iter_range():
+            with open(path, "rb") as f:
+                f.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(CHUNK, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+        headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(length),
+        }
+        return StreamingResponse(iter_range(), status_code=206, headers=headers, media_type=media)
+
+    def iter_all():
+        with open(path, "rb") as f:
+            while chunk := f.read(CHUNK):
+                yield chunk
+
+    return StreamingResponse(
+        iter_all(), headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
+        media_type=media,
+    )
+
+
+# ---- helpers -------------------------------------------------------------
 def _require_match(session: Session, match_id: int):
     match = match_service.get_match(session, match_id)
     if match is None:
         raise HTTPException(status_code=404, detail="Match not found")
     return match
+
+
+def _require_round(session: Session, round_id: int):
+    rnd = match_service.get_round(session, round_id)
+    if rnd is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    return rnd
+
+
+def _detail(match) -> MatchDetail:
+    summary = match_service.to_summary(match)
+    return MatchDetail(
+        **summary.model_dump(),
+        rounds=[RoundOut.model_validate(r) for r in match.rounds],
+    )

@@ -5,46 +5,61 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import DetectionSource, ProcessingStatus, Team
+from .models import DetectionSource, ProcessingStatus, Side, Team, UtilityKind
 
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ---- Matches -------------------------------------------------------------
+# ---- Matches & rounds ----------------------------------------------------
+class MatchCreate(BaseModel):
+    name: str | None = None
+    map_name: str | None = None
+    side: Side = Side.UNKNOWN
+
+
 class MatchSummary(ORMModel):
     id: int
-    filename: str
+    name: str
     map_name: str | None
+    side: Side
+    created_at: datetime
+    updated_at: datetime
+    rounds_count: int = 0
+    completed_rounds: int = 0
+
+
+class RoundOut(ORMModel):
+    id: int
+    match_id: int
+    round_number: int
+    filename: str
     status: ProcessingStatus
+    status_detail: str | None
     progress: float
+    map_name: str | None
+    map_confidence: float
+    side: Side
+    side_confidence: float
+    score_text: str | None
+    economy: str | None
+    spike_planted: bool
     duration_seconds: float | None
     detections_count: int
+    committed_site: str | None
     created_at: datetime
     processed_at: datetime | None
 
 
 class MatchDetail(MatchSummary):
-    stored_path: str
-    status_detail: str | None
-    fps: float | None
-    frame_count: int | None
-
-
-class RoundOut(ORMModel):
-    id: int
-    round_number: int
-    start_seconds: float
-    end_seconds: float | None
-    score_text: str | None
-    spike_planted: bool
+    rounds: list[RoundOut] = Field(default_factory=list)
 
 
 class DetectionOut(ORMModel):
     id: int
+    round_id: int
     timestamp_seconds: float
-    frame_number: int
     agent_name: str | None
     team: Team
     source: DetectionSource
@@ -52,6 +67,17 @@ class DetectionOut(ORMModel):
     map_x: float | None
     map_y: float | None
     callout: str | None
+
+
+class UtilityOut(ORMModel):
+    id: int
+    timestamp_seconds: float
+    kind: UtilityKind
+    agent_name: str | None
+    callout: str | None
+    map_x: float | None
+    map_y: float | None
+    confidence: float
 
 
 class KillfeedOut(ORMModel):
@@ -64,119 +90,122 @@ class KillfeedOut(ORMModel):
     killer_team: Team
 
 
-# ---- Analysis ------------------------------------------------------------
-class LastKnownPosition(BaseModel):
+# ---- Intelligence payload (drives the dashboard) -------------------------
+class MarkerOut(BaseModel):
+    team: Team
     agent_name: str | None
-    map_x: float | None
-    map_y: float | None
+    map_x: float
+    map_y: float
     callout: str | None
-    last_seen_seconds: float
-    age_seconds: float = Field(description="Seconds elapsed since the sighting at query time.")
-    confidence: float
-    source: DetectionSource
-    stale: bool = Field(description="True when age exceeds the requested TTL.")
+    dead: bool = False
+    kind: str = "player"  # "player" | "self" | "spike" | utility kind
 
 
-class RotationCandidate(BaseModel):
-    from_callout: str | None
-    to_callout: str
-    to_x: float
-    to_y: float
-    distance_norm: float
-    eta_seconds: float = Field(description="Estimated travel time from last sighting location.")
-    likelihood: float = Field(description="Relative likelihood in [0, 1].")
-    leads_to_site: str | None
-
-
-class EnemyRotation(BaseModel):
-    agent_name: str | None
-    origin_callout: str | None
-    age_seconds: float
-    candidates: list[RotationCandidate]
-
-
-class SitePressure(BaseModel):
-    site: str
-    pressure: float = Field(description="Normalized pressure in [0, 1].")
-    enemy_count: float = Field(description="Recency-weighted count of enemies near the site.")
-    confidence: float
-    contributing_callouts: list[str]
-
-
-class AnalysisSnapshot(BaseModel):
-    """Everything the dashboard needs for a single moment in the VOD."""
-
-    match_id: int
+class DetectedInfo(BaseModel):
     map_name: str | None
-    at_seconds: float
-    ttl_seconds: float
-    last_known: list[LastKnownPosition]
-    rotations: list[EnemyRotation]
-    site_pressure: list[SitePressure]
+    map_confidence: float
+    side: Side
+    side_confidence: float
+    round_number: int
+    score_text: str | None
+    round_time: str | None
+    players_alive_ally: int | None
+    players_alive_enemy: int | None
+    spike_planted: bool
+    economy: str | None
 
 
-# ---- Tendencies (scouting report) ---------------------------------------
-class SiteFrequency(BaseModel):
-    site: str
-    rounds: int = Field(description="Number of rounds the enemy committed to this site.")
-    share: float = Field(description="Fraction of analyzed rounds in [0, 1].")
-
-
-class AgentSiteShare(BaseModel):
-    site: str
-    share: float
-
-
-class AgentSitePreference(BaseModel):
-    agent_name: str | None
-    rounds_seen: int
-    sites: list[AgentSiteShare]
-
-
-class TendencyReport(BaseModel):
-    """Aggregated enemy site tendencies across the analyzed rounds.
-
-    A *post-match* scouting report (where did they tend to go, which site does
-    each agent favor) — derived only from observed sightings, for study and
-    preparation. It is not a live in-match overlay.
-    """
-
-    match_id: int
-    map_name: str | None
-    rounds_analyzed: int
-    site_frequency: list[SiteFrequency]
-    agent_site_preference: list[AgentSitePreference]
-
-
-# ---- Next-round prediction (smart scouting model) -----------------------
-class SitePrediction(BaseModel):
-    site: str
-    probability: float = Field(description="Predicted commitment probability in [0, 1].")
-
-
-class PredictionFactor(BaseModel):
+class TimelineEvent(BaseModel):
+    timestamp_seconds: float
+    kind: str  # move | spotted | smoke | recon | turret | rotation | kill | info
     label: str
-    detail: str
-    weight: float = Field(description="Relative influence of this factor in [0, 1].")
+    detail: str | None = None
 
 
-class NextRoundPrediction(BaseModel):
-    """Predicted enemy site commitment for the next round.
+class PositionProbability(BaseModel):
+    site: str
+    probability: float
 
-    A *post-match* scouting prediction built from observed round-by-round
-    commitments (map as the primary source). It is study/preparation material,
-    not a live in-match overlay.
-    """
 
-    match_id: int
-    map_name: str | None
+class PatternItem(BaseModel):
+    kind: str  # presence | rotation | anchor | aggression
+    text: str
+    detail: str | None = None
+    confidence: float
+
+
+class HeatCell(BaseModel):
+    x: float
+    y: float
+    weight: float
+
+
+class MatchMemory(BaseModel):
     rounds_analyzed: int
-    predicted_sites: list[SitePrediction]
-    confidence: float = Field(description="Overall confidence in [0, 1].")
-    top_factor: str | None
-    factors: list[PredictionFactor]
-    last_committed_site: str | None
-    per_round_commitment: list[str]
+    site_presence: dict[str, float]  # site -> share [0,1]
+    avg_rotation_time: float | None
+    common_utility: str | None
+    enemy_economy: str | None
+    confidence: float
+
+
+class EnemyProfile(BaseModel):
+    agent_name: str | None
+    note: str
+    favored_site: str | None
+    site_share: float
+    rotation_tendency: str | None
+    rounds_seen: int
+
+
+class WeaponEconomy(BaseModel):
+    enemy_label: str | None
+    enemy_tier: str  # eco | force | full | unknown
+    ally_label: str | None
+    ally_tier: str
+
+
+class DetectedPositionLive(BaseModel):
+    agent_name: str | None
+    team: Team
+    callout: str | None
+    age_seconds: float
+
+
+class Recommendation(BaseModel):
+    best_site: str | None
+    success_probability: float
+    confidence: float
+    confidence_label: str
+    reasons: list[str]
+    suggested_play: list[str]
+
+
+class AnalysisLogStep(BaseModel):
+    step: int
+    title: str
+    detail: str
+    status: str = "done"  # done | skipped | warning
+
+
+class MatchIntelligence(BaseModel):
+    """Everything the analysis dashboard needs for the selected match."""
+
+    match: MatchSummary
+    current_round: RoundOut | None
+    detected_info: DetectedInfo | None
+    minimap_markers: list[MarkerOut]
+    utilities: list[UtilityOut]
+    timeline: list[TimelineEvent]
+    detected_positions: list[DetectedPositionLive]
+    position_probabilities: list[PositionProbability]
+    patterns: list[PatternItem]
+    heatmap: list[HeatCell]
+    match_memory: MatchMemory
+    enemy_profiles: list[EnemyProfile]
+    weapon_economy: WeaponEconomy
+    recommendation: Recommendation
+    analysis_log: list[AnalysisLogStep]
 
 
 # ---- Maps ----------------------------------------------------------------

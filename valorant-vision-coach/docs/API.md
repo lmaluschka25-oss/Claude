@@ -1,112 +1,88 @@
 # API reference
 
-Base URL: `http://localhost:8000/api`. Interactive docs (OpenAPI/Swagger) are at
-`http://localhost:8000/docs`.
+Base URL: `http://localhost:8000/api`. Interactive docs at `/docs`.
 
-All times are **seconds into the recording**. `ttl` is the sighting decay window
-in seconds. `at` defaults to the end of the match; `ttl` defaults to
-`VVC_SIGHTING_TTL_SECONDS`.
+A **match** owns many **rounds**; each round is one uploaded recording.
+Match-level **intelligence** is aggregated across the match's rounds.
 
-## System
+## System & maps
 
 | Method & path        | Description                          |
 |----------------------|--------------------------------------|
 | `GET /health`        | Liveness probe.                      |
-| `GET /system/info`   | Backend status (detector/OCR readiness, available maps). |
-
-## Maps
-
-| Method & path        | Description                          |
-|----------------------|--------------------------------------|
-| `GET /maps`          | List available map names.            |
-| `GET /maps/{name}`   | Callouts, sites, and rotation edges. |
+| `GET /system/info`   | Detector/OCR status, available maps. |
+| `GET /maps`          | List map names.                      |
+| `GET /maps/{name}`   | Callouts, sites, rotation edges.     |
 
 ## Matches
 
-| Method & path                       | Description                                   |
-|-------------------------------------|-----------------------------------------------|
-| `GET /matches`                      | List matches (newest first).                  |
-| `POST /matches`                     | Upload a recording (multipart). Starts processing. |
-| `GET /matches/{id}`                 | Match detail + processing status/progress.    |
-| `DELETE /matches/{id}`              | Delete a match, its data, and the stored file.|
-| `GET /matches/{id}/rounds`          | Detected rounds.                              |
-| `GET /matches/{id}/detections`      | Raw detections. Filters: `start,end,team,source,limit`. |
-| `GET /matches/{id}/killfeed`        | Parsed killfeed events.                       |
+| Method & path                     | Description                                   |
+|-----------------------------------|-----------------------------------------------|
+| `GET /matches`                    | List matches (with round counts).             |
+| `POST /matches`                   | Create a match. Body: `{name?, map_name?, side?}`. |
+| `GET /matches/{id}`               | Match detail + its rounds.                    |
+| `DELETE /matches/{id}`            | Delete match, rounds, and files.              |
+| `GET /matches/{id}/rounds`        | List the match's rounds.                      |
+| `POST /matches/{id}/rounds`       | Upload a recording (multipart `file`, optional `map_name`). Starts processing. |
+| `GET /matches/{id}/intelligence`  | Full dashboard payload. Optional `?round_id=` to focus a round's scene. |
 
-`POST /matches` fields: `file` (required, video), `map_name` (optional; auto if
-omitted).
+## Rounds
 
-## Analysis
+| Method & path                          | Description                          |
+|----------------------------------------|--------------------------------------|
+| `GET /rounds/{id}`                     | Round status/metadata.               |
+| `DELETE /rounds/{id}`                  | Delete a round.                      |
+| `GET /rounds/{id}/detections`          | Raw detections for the round.        |
+| `GET /rounds/{id}/video`              | Stream the recording (HTTP range).   |
+| `GET /rounds/{id}/minimap-preview`     | PNG calibration frame. Params: `t`, `mask`, `x_frac,y_frac,w_frac,h_frac`, `sat_min,val_min`. |
 
-| Method & path                                  | Query params              |
-|------------------------------------------------|---------------------------|
-| `GET /matches/{id}/analysis/snapshot`          | `at`, `ttl`               |
-| `GET /matches/{id}/analysis/last-known`        | `at`, `ttl`, `include_stale` |
-| `GET /matches/{id}/analysis/rotations`         | `at`, `ttl`               |
-| `GET /matches/{id}/analysis/site-pressure`     | `at`, `ttl`               |
+## The intelligence payload
 
-The **snapshot** endpoint returns all three views in one call — it is what the
-dashboard uses as you scrub the timeline.
+`GET /matches/{id}/intelligence` returns everything the dashboard renders:
+
+```jsonc
+{
+  "match": { "id": 1, "name": "...", "map_name": "ascent", "side": "attack",
+             "rounds_count": 3, "completed_rounds": 3 },
+  "current_round": { "round_number": 3, "status": "completed", ... },
+  "detected_info": { "map_name": "ascent", "side": "attack", "score_text": "4-2",
+                     "round_time": "1:12", "players_alive_ally": 5,
+                     "players_alive_enemy": 5, "economy": "Full Buy" },
+  "minimap_markers": [ { "team": "enemy", "agent_name": "Killjoy",
+                         "map_x": 0.8, "map_y": 0.24, "callout": "B Site",
+                         "dead": false, "kind": "player" } ],
+  "utilities": [ { "kind": "smoke", "agent_name": "Omen", "callout": "A Site" } ],
+  "timeline": [ { "timestamp_seconds": 6.2, "kind": "spotted", "label": "Enemy Seen" } ],
+  "detected_positions": [ { "agent_name": "Jett", "callout": "A Main", "age_seconds": 2.1 } ],
+  "position_probabilities": [ { "site": "A", "probability": 0.59 },
+                              { "site": "B", "probability": 0.41 } ],
+  "patterns": [ { "kind": "anchor", "text": "Killjoy anchors B",
+                  "detail": "3/3 rounds", "confidence": 0.95 } ],
+  "heatmap": [ { "x": 0.8, "y": 0.24, "weight": 1.0 } ],
+  "match_memory": { "rounds_analyzed": 3, "site_presence": {"A":0.67,"B":0.33,"MID":0},
+                    "common_utility": "Smoke", "enemy_economy": "Full Buy",
+                    "confidence": 0.56 },
+  "enemy_profiles": [ { "agent_name": "Killjoy", "favored_site": "B",
+                        "site_share": 1.0, "rotation_tendency": "Rarely rotates",
+                        "rounds_seen": 3 } ],
+  "weapon_economy": { "enemy_label": "Full Buy", "enemy_tier": "full",
+                      "ally_label": "Full Buy", "ally_tier": "full" },
+  "recommendation": { "best_site": "B", "success_probability": 0.8,
+                      "confidence": 0.56, "confidence_label": "Medium",
+                      "reasons": ["Enemies commit to A most ...", "..."],
+                      "suggested_play": ["Take B with 3–4 players.", "..."] },
+  "analysis_log": [ { "step": 1, "title": "Map Identified", "detail": "ascent (99%)" } ]
+}
+```
 
 ## Quickstart (curl)
 
 ```bash
-# Upload a recording (mock backend will synthesize detections)
-curl -F "file=@match.mp4" -F "map_name=ascent" http://localhost:8000/api/matches
-
-# Poll status
-curl http://localhost:8000/api/matches/1
-
-# Tactical snapshot at 75s with a 15s sighting window
-curl "http://localhost:8000/api/matches/1/analysis/snapshot?at=75&ttl=15"
+M=$(curl -s -X POST localhost:8000/api/matches -H 'Content-Type: application/json' \
+     -d '{"map_name":"ascent","side":"attack"}' | jq .id)
+curl -s -F "file=@round1.mp4" localhost:8000/api/matches/$M/rounds
+curl -s "localhost:8000/api/matches/$M/intelligence" | jq .recommendation
 ```
 
-## Sample snapshot response
-
-```jsonc
-{
-  "match_id": 1,
-  "map_name": "ascent",
-  "at_seconds": 75.0,
-  "ttl_seconds": 15.0,
-  "last_known": [
-    {
-      "agent_name": "Jett",
-      "map_x": 0.22, "map_y": 0.30, "callout": "A Site",
-      "last_seen_seconds": 68.4, "age_seconds": 6.6,
-      "confidence": 0.71, "source": "minimap", "stale": false
-    }
-  ],
-  "rotations": [
-    {
-      "agent_name": "Jett",
-      "origin_callout": "A Site",
-      "age_seconds": 6.6,
-      "candidates": [
-        {
-          "from_callout": "A Site", "to_callout": "A Link",
-          "to_x": 0.30, "to_y": 0.36,
-          "distance_norm": 0.16, "eta_seconds": 1.2,
-          "likelihood": 0.41, "leads_to_site": null
-        }
-      ]
-    }
-  ],
-  "site_pressure": [
-    {
-      "site": "A", "pressure": 0.58, "enemy_count": 1.4,
-      "confidence": 0.75, "contributing_callouts": ["A Site", "A Link"]
-    },
-    { "site": "B", "pressure": 0.0, "enemy_count": 0.0, "confidence": 0.0, "contributing_callouts": [] }
-  ]
-}
-```
-
-## Notes
-
-- `source` is `minimap` (revealed marker, precise location) or `viewport` (seen
-  in the 3D view, located by the player's own position as a proxy).
-- `likelihood` values within one enemy's `candidates` form a normalized
-  distribution.
-- All analysis is derived solely from on-screen observations; see
-  [ETHICS.md](ETHICS.md).
+All values are derived from on-screen observations aggregated across rounds —
+never hidden state. See [ETHICS.md](ETHICS.md).

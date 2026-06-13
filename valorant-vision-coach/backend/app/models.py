@@ -1,14 +1,17 @@
-"""ORM models.
+"""ORM models for the Match Intelligence platform.
 
-Data model overview
--------------------
-``Match``          one uploaded recording + its processing status.
-``Round``          a detected round within a match (best-effort segmentation).
-``Detection``      a single on-screen observation of an agent/enemy at a time.
-``KillfeedEvent``  a parsed killfeed line (killer, victim, weapon, headshot).
+Domain model
+------------
+``Match``             one competitive match (a map, a side, a growing memory).
+``Round``             one *uploaded recording* = one round belonging to a match.
+``Detection``         an on-screen sighting of an agent/enemy/ally in a round.
+``UtilityDetection``  an on-screen utility marker (smoke, recon, turret, …).
+``KillfeedEvent``     a parsed killfeed line.
 
-Every row is derived purely from pixels that were visible on the player's
-screen. No field originates from game memory, packets, or hidden state.
+A match accumulates rounds; intelligence (memory, patterns, predictions) is
+aggregated across every round in the match. Every row is derived purely from
+pixels visible on the player's own screen — never game memory, packets, or
+hidden state.
 """
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Enum,
     Float,
@@ -46,58 +50,97 @@ class Team(str, enum.Enum):
     UNKNOWN = "unknown"
 
 
+class Side(str, enum.Enum):
+    ATTACK = "attack"
+    DEFENSE = "defense"
+    UNKNOWN = "unknown"
+
+
 class DetectionSource(str, enum.Enum):
-    # Enemy/agent recognized in the main 3D viewport (the player saw them).
-    VIEWPORT = "viewport"
-    # A revealed dot on the player's own minimap (legitimately visible).
-    MINIMAP = "minimap"
+    VIEWPORT = "viewport"  # seen in the 3D view
+    MINIMAP = "minimap"  # a revealed marker on the player's own minimap
+
+
+class UtilityKind(str, enum.Enum):
+    SMOKE = "smoke"
+    RECON = "recon"
+    TURRET = "turret"
+    TRAP = "trap"
+    FLASH = "flash"
+    MOLLY = "molly"
+    WALL = "wall"
+    OTHER = "other"
 
 
 class Match(Base):
+    """A competitive match — the unit that owns rounds and accumulates memory."""
+
     __tablename__ = "matches"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    side: Mapped[Side] = mapped_column(Enum(Side), default=Side.UNKNOWN)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+    rounds: Mapped[list[Round]] = relationship(
+        back_populates="match",
+        cascade="all, delete-orphan",
+        order_by="Round.round_number",
+    )
+
+
+class Round(Base):
+    """One uploaded recording, analyzed as a single round of its match."""
+
+    __tablename__ = "rounds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id", ondelete="CASCADE"), index=True)
+    round_number: Mapped[int] = mapped_column(Integer)
+
     filename: Mapped[str] = mapped_column(String(512))
     stored_path: Mapped[str] = mapped_column(String(1024))
-    map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     status: Mapped[ProcessingStatus] = mapped_column(
         Enum(ProcessingStatus), default=ProcessingStatus.PENDING, index=True
     )
     status_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
-    progress: Mapped[float] = mapped_column(Float, default=0.0)  # 0..1
+    progress: Mapped[float] = mapped_column(Float, default=0.0)
+
+    # Auto-detected per round (best effort); fall back to the match's values.
+    map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    map_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    side: Mapped[Side] = mapped_column(Enum(Side), default=Side.UNKNOWN)
+    side_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    score_text: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    round_time: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    economy: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    spike_planted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     fps: Mapped[float | None] = mapped_column(Float, nullable=True)
     frame_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     detections_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    committed_site: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    rounds: Mapped[list[Round]] = relationship(
-        back_populates="match", cascade="all, delete-orphan"
-    )
+    match: Mapped[Match] = relationship(back_populates="rounds")
     detections: Mapped[list[Detection]] = relationship(
-        back_populates="match", cascade="all, delete-orphan"
+        back_populates="round", cascade="all, delete-orphan"
+    )
+    utilities: Mapped[list[UtilityDetection]] = relationship(
+        back_populates="round", cascade="all, delete-orphan"
     )
     killfeed: Mapped[list[KillfeedEvent]] = relationship(
-        back_populates="match", cascade="all, delete-orphan"
+        back_populates="round", cascade="all, delete-orphan"
     )
-
-
-class Round(Base):
-    __tablename__ = "rounds"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id", ondelete="CASCADE"), index=True)
-    round_number: Mapped[int] = mapped_column(Integer)
-    start_seconds: Mapped[float] = mapped_column(Float)
-    end_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # Scoreboard at round start, if read: "7-5" style, plus spike-planted flag.
-    score_text: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    spike_planted: Mapped[bool] = mapped_column(default=False)
-
-    match: Mapped[Match] = relationship(back_populates="rounds")
 
 
 class Detection(Base):
@@ -105,9 +148,7 @@ class Detection(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id", ondelete="CASCADE"), index=True)
-    round_id: Mapped[int | None] = mapped_column(
-        ForeignKey("rounds.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    round_id: Mapped[int] = mapped_column(ForeignKey("rounds.id", ondelete="CASCADE"), index=True)
 
     timestamp_seconds: Mapped[float] = mapped_column(Float, index=True)
     frame_number: Mapped[int] = mapped_column(Integer)
@@ -119,20 +160,35 @@ class Detection(Base):
     )
     confidence: Mapped[float] = mapped_column(Float)
 
-    # Normalized map coordinates in [0, 1]; null when location could not be
-    # resolved (e.g. enemy seen in viewport but player position unknown).
     map_x: Mapped[float | None] = mapped_column(Float, nullable=True)
     map_y: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # Nearest named callout, resolved from map metadata.
     callout: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    # Raw screen-space bounding box (pixels): x, y, w, h.
     bbox_x: Mapped[float | None] = mapped_column(Float, nullable=True)
     bbox_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     bbox_w: Mapped[float | None] = mapped_column(Float, nullable=True)
     bbox_h: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    match: Mapped[Match] = relationship(back_populates="detections")
+    round: Mapped[Round] = relationship(back_populates="detections")
+
+
+class UtilityDetection(Base):
+    __tablename__ = "utility_detections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id", ondelete="CASCADE"), index=True)
+    round_id: Mapped[int] = mapped_column(ForeignKey("rounds.id", ondelete="CASCADE"), index=True)
+
+    timestamp_seconds: Mapped[float] = mapped_column(Float, index=True)
+    kind: Mapped[UtilityKind] = mapped_column(Enum(UtilityKind), default=UtilityKind.OTHER)
+    agent_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+
+    map_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    map_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    callout: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    round: Mapped[Round] = relationship(back_populates="utilities")
 
 
 class KillfeedEvent(Base):
@@ -140,14 +196,13 @@ class KillfeedEvent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id", ondelete="CASCADE"), index=True)
-    round_id: Mapped[int | None] = mapped_column(
-        ForeignKey("rounds.id", ondelete="SET NULL"), nullable=True
-    )
+    round_id: Mapped[int] = mapped_column(ForeignKey("rounds.id", ondelete="CASCADE"), index=True)
+
     timestamp_seconds: Mapped[float] = mapped_column(Float, index=True)
     killer: Mapped[str | None] = mapped_column(String(64), nullable=True)
     victim: Mapped[str | None] = mapped_column(String(64), nullable=True)
     weapon: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    headshot: Mapped[bool] = mapped_column(default=False)
+    headshot: Mapped[bool] = mapped_column(Boolean, default=False)
     killer_team: Mapped[Team] = mapped_column(Enum(Team), default=Team.UNKNOWN)
 
-    match: Mapped[Match] = relationship(back_populates="killfeed")
+    round: Mapped[Round] = relationship(back_populates="killfeed")

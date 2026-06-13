@@ -1,5 +1,4 @@
-// Thin API client. Defaults to same-origin "/api" (works in dev via the Vite
-// proxy and in Docker via nginx). Override with VITE_API_BASE if needed.
+// API client for the Match Intelligence platform.
 const BASE = import.meta.env.VITE_API_BASE || "/api";
 
 async function req(path, options = {}) {
@@ -10,10 +9,9 @@ async function req(path, options = {}) {
   if (!res.ok) {
     let detail = res.statusText;
     try {
-      const body = await res.json();
-      detail = body.detail || detail;
+      detail = (await res.json()).detail || detail;
     } catch {
-      /* non-JSON error body */
+      /* non-JSON */
     }
     throw new Error(`${res.status}: ${detail}`);
   }
@@ -21,44 +19,50 @@ async function req(path, options = {}) {
   return res.json();
 }
 
+function jsonBody(body) {
+  return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
+
 export const api = {
+  base: BASE,
   systemInfo: () => req("/system/info"),
   listMaps: () => req("/maps"),
   getMap: (name) => req(`/maps/${name}`),
 
   listMatches: () => req("/matches"),
+  createMatch: (body) => req("/matches", jsonBody(body)),
   getMatch: (id) => req(`/matches/${id}`),
   deleteMatch: (id) => req(`/matches/${id}`, { method: "DELETE" }),
-  getRounds: (id) => req(`/matches/${id}/rounds`),
-  getKillfeed: (id) => req(`/matches/${id}/killfeed`),
+  listRounds: (id) => req(`/matches/${id}/rounds`),
+  getIntelligence: (id, roundId) =>
+    req(`/matches/${id}/intelligence${roundId ? `?round_id=${roundId}` : ""}`),
 
-  getSnapshot: (id, at, ttl) => {
-    const params = new URLSearchParams();
-    if (at != null) params.set("at", at);
-    if (ttl != null) params.set("ttl", ttl);
-    return req(`/matches/${id}/analysis/snapshot?${params.toString()}`);
+  getRound: (id) => req(`/rounds/${id}`),
+  deleteRound: (id) => req(`/rounds/${id}`, { method: "DELETE" }),
+  roundVideoUrl: (id) => `${BASE}/rounds/${id}/video`,
+  minimapPreviewUrl: (id, opts = {}) => {
+    const p = new URLSearchParams({ t: opts.t ?? 0 });
+    if (opts.mask) p.set("mask", "1");
+    for (const k of ["x_frac", "y_frac", "w_frac", "h_frac", "sat_min", "val_min"]) {
+      if (opts[k] != null) p.set(k, opts[k]);
+    }
+    return `${BASE}/rounds/${id}/minimap-preview?${p.toString()}`;
   },
-  getTendencies: (id) => req(`/matches/${id}/analysis/tendencies`),
-  getPrediction: (id) => req(`/matches/${id}/analysis/prediction`),
-  minimapPreviewUrl: (id, t, mask = false) =>
-    `${BASE}/matches/${id}/minimap-preview?t=${t}${mask ? "&mask=1" : ""}`,
 
-  // Upload with progress via XHR (fetch lacks upload progress events).
-  uploadMatch(file, mapName, onProgress) {
+  // Upload a round recording to a match (XHR for progress).
+  uploadRound(matchId, file, mapName, onProgress) {
     return new Promise((resolve, reject) => {
       const form = new FormData();
       form.append("file", file);
       if (mapName) form.append("map_name", mapName);
-
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${BASE}/matches`);
+      xhr.open("POST", `${BASE}/matches/${matchId}/rounds`);
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
       };
       xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(JSON.parse(xhr.responseText));
-        } else {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+        else {
           let detail = xhr.statusText;
           try {
             detail = JSON.parse(xhr.responseText).detail || detail;

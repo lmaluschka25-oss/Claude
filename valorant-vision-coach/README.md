@@ -1,98 +1,109 @@
-# Valorant Vision Coach
+# Valorant Match Intelligence
 
-A **post-match** coaching tool that analyzes your *recorded* Valorant gameplay
-with computer vision and turns it into a tactical review dashboard. It reads
-**only what was visible on your own screen** — the 3D viewport, your minimap,
-the killfeed, the scoreboard, and the round timer — and never anything else.
+A **persistent, post-match Valorant analysis platform**. It is not a one-shot
+screenshot tool: every recording you add belongs to a **match**, and the system
+builds a growing **Match Memory** that learns the opponent round by round —
+surfacing patterns, position probabilities, and a next-round recommendation,
+with every reasoning step shown in the UI.
 
-> **Scope & fair play.** This project deliberately does **not** do anything that
-> runs alongside a live game or touches privileged data. No real-time overlay,
-> no game-memory reads, no packet inspection, no reading of hidden/unseen
-> enemies, no input automation. It ingests a video file *after* the match, the
-> same footage a coach would scrub through. See [docs/ETHICS.md](docs/ETHICS.md)
-> for the full boundary and why it was drawn here.
+> **Scope & fair play.** This is strictly **post-match**. It analyzes recordings
+> *after* you play and reads **only what was visible on your own screen**
+> (minimap, viewport, killfeed, scoreboard, timer). No real-time overlay, no
+> game-memory reads, no packet inspection, no hidden-info reveal, no input
+> automation. See [docs/ETHICS.md](docs/ETHICS.md).
 
 ## What it does
 
-Upload a match recording and the pipeline produces, frame by frame:
-
-- **Enemy & agent detections** — agent name, team, confidence, timestamp.
-- **Location on the map** — from revealed enemy markers on *your* minimap, or
-  your own position as an engagement proxy for viewport sightings.
-- **Killfeed / scoreboard / timer** parsing (when OCR is enabled), used to
-  segment rounds.
-- A **Last Known Enemy Position** system with a configurable decay (old
-  sightings drop off after a TTL you choose).
-- **Rotation estimates** — transparent dead-reckoning over a map callout graph,
-  bounded by how far an enemy could have moved since you last saw them.
-- **Site pressure** — recency/proximity-weighted enemy presence per bomb site.
-
-…all surfaced in a modern tactical dashboard with a round-by-round timeline
-scrubber. Everything runs locally; nothing is uploaded anywhere.
+- **Match management** — create matches, add rounds (record screen in-browser
+  or upload), reopen history; everything persisted in SQLite.
+- **Per-round analysis pipeline** — detect minimap markers (enemies/allies/you),
+  utilities, killfeed; resolve callouts; derive the round's committed site and
+  HUD metadata; show a step-by-step **Analysis Log**.
+- **Match Memory & pattern learning** — across rounds: site presence, agent site
+  preferences ("Killjoy anchors B", "Heavy A Presence"), enemy profiles,
+  economy read; **confidence rises** as more rounds are analyzed.
+- **Prediction & recommendation** — next-round **position probabilities**
+  (A/B/Mid …) from a base-rate + momentum + Markov blend, and a **best-site
+  recommendation** with reasons and a suggested play.
+- **Visual workspace** — enlarged tactical minimap, original round video, round
+  timeline, heatmap (site control), and all of the above as a professional
+  dashboard.
 
 ## Tech stack
 
-| Layer      | Tech                                            |
-|------------|-------------------------------------------------|
-| Backend    | Python · FastAPI · SQLAlchemy · SQLite          |
-| Vision     | OpenCV · Ultralytics YOLO · EasyOCR (optional)  |
-| Frontend   | React · Vite (SVG tactical map, no game assets) |
-| Packaging  | Docker · docker-compose                         |
+| Layer     | Tech                                                  |
+|-----------|-------------------------------------------------------|
+| Backend   | Python · FastAPI · SQLAlchemy · SQLite                |
+| Vision    | OpenCV · color-based minimap detector · YOLO (optional) · EasyOCR (optional) |
+| Frontend  | React · Vite (vector dashboard, no game assets)       |
+| Packaging | Docker · docker-compose                               |
 
 ## Quick start (Docker)
 
 ```bash
-cp .env.example .env          # optional; defaults are fine
+cp .env.example .env          # optional
 docker compose up --build
 ```
 
 - Dashboard → http://localhost:5173
 - API docs  → http://localhost:8000/docs
 
-This boots with the **mock detector** so you can explore the whole app
-immediately — no GPU or trained weights required. To run real inference, see
-[docs/SETUP.md](docs/SETUP.md#real-inference).
+Boots with the **mock detector** so the whole dashboard is explorable
+immediately. For real footage set `VVC_DETECTOR_BACKEND=minimap` (no ML needed)
+and calibrate in the **Settings** tab; see [docs/SETUP.md](docs/SETUP.md).
 
-## Quick start (local, no Docker)
+## Quick start (local)
 
 ```bash
 # Backend
-cd backend
-python -m venv .venv && source .venv/bin/activate
+cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-uvicorn app.main:app --reload          # http://localhost:8000
+uvicorn app.main:app --reload
 
-# Frontend (new terminal)
-cd frontend
-npm install
-npm run dev                            # http://localhost:5173
+# Frontend
+cd frontend && npm install && npm run dev
 ```
 
-Run the tests:
+Tests: `cd backend && pytest`
 
-```bash
-cd backend && pytest
-```
+## Using it
+
+1. **MATCHES** tab → create a match (pick the map / side).
+2. Open it (**ANALYSIS** tab) → **Record round** or **Upload recording** in the
+   sidebar. Each upload becomes a round and is analyzed in the background.
+3. As rounds complete, the dashboard fills in: minimap, timeline, live
+   positions, probabilities, patterns, heatmap, match memory, enemy profiles,
+   recommendation, and the analysis log.
+4. **LEARNINGS** shows what the system has learned across the match;
+   **SETTINGS** has system info + minimap calibration.
+
+## Detector backends
+
+| `VVC_DETECTOR_BACKEND` | What it does |
+|------------------------|--------------|
+| `minimap`              | Classical CV — reads revealed **red enemy dots** off your minimap. Real, no training. Calibrate the ROI in Settings. |
+| `yolo`                 | Full detection incl. agents — needs trained weights (`requirements-ml.txt`). |
+| `mock` (default)       | Deterministic synthetic match data for demos/tests. |
 
 ## Documentation
 
-- [docs/SETUP.md](docs/SETUP.md) — install, configuration, training a model.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the pipeline and analysis work.
+- [docs/SETUP.md](docs/SETUP.md) — install, configuration, calibration, training.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — model, pipeline, intelligence.
 - [docs/API.md](docs/API.md) — REST endpoints.
-- [docs/ETHICS.md](docs/ETHICS.md) — scope, fair-play boundary, and limitations.
+- [docs/ETHICS.md](docs/ETHICS.md) — scope and fair-play boundary.
 
 ## Project layout
 
 ```
 valorant-vision-coach/
-├── backend/         FastAPI app, vision pipeline, analysis, tests
-│   ├── app/
-│   │   ├── vision/      detector, OCR, minimap calibration, map metadata
-│   │   ├── analysis/    last-known positions, rotation, site pressure
-│   │   ├── services/    processing pipeline + persistence helpers
-│   │   └── api/         REST routes
-│   └── data/maps/       callout graphs (Ascent, Bind)
-├── frontend/        React + Vite tactical dashboard
-├── docs/            setup, architecture, API, ethics
+├── backend/   FastAPI app
+│   └── app/
+│       ├── vision/      detector (mock / minimap-CV / YOLO), OCR, calibration, maps
+│       ├── analysis/    intelligence aggregation (memory, patterns, prediction)
+│       ├── services/    round-processing pipeline + persistence
+│       └── api/routes/  matches, rounds, intelligence, maps, system
+├── frontend/  React dashboard (TopNav · Analysis · Learnings · Settings)
 └── docker-compose.yml
 ```
+
+Not affiliated with or endorsed by Riot Games.

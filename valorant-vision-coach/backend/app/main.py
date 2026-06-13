@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
-from .api.routes import analysis, maps, matches, system
+from .api.routes import maps, matches, system
 from .config import settings
 from .database import init_db
 from .logging_config import configure_logging, get_logger
@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(system.router, prefix=api_prefix)
     app.include_router(maps.router, prefix=api_prefix)
     app.include_router(matches.router, prefix=api_prefix)
-    app.include_router(analysis.router, prefix=api_prefix)
+    app.include_router(matches.rounds_router, prefix=api_prefix)
 
     @app.get("/", tags=["system"])
     def root() -> dict:

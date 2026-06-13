@@ -45,23 +45,36 @@ class RawDetection:
 
 @dataclass
 class ParsedLabel:
-    kind: str  # "mm_self" | "mm_enemy" | "viewport_enemy" | "viewport_ally"
+    kind: str  # mm_self | mm_enemy | mm_ally | viewport_enemy | viewport_ally | utility
     agent: str | None
     is_enemy: bool
+    util_kind: str | None = None
 
 
 def parse_label(label: str) -> ParsedLabel:
-    """Interpret a detector label into structured semantics."""
+    """Interpret a detector label into structured semantics.
+
+    Vocabulary: ``mm_self``, ``mm_enemy[:agent]``, ``mm_ally[:agent]``,
+    ``enemy[:agent]``, ``ally[:agent]``, ``util:<kind>[:agent]``.
+    """
     raw = label.strip().lower()
     if raw in {"mm_self", "self", "player"}:
         return ParsedLabel("mm_self", None, False)
-    if raw.startswith("mm_enemy") or raw == "mm_enemy":
+    if raw.startswith("util"):
+        parts = raw.split(":")
+        kind = parts[1] if len(parts) > 1 else "other"
+        agent = parts[2] if len(parts) > 2 else None
+        return ParsedLabel("utility", normalize_agent(agent), False, util_kind=kind)
+    if raw.startswith("mm_enemy"):
         agent = raw.split(":", 1)[1] if ":" in raw else None
         return ParsedLabel("mm_enemy", normalize_agent(agent), True)
+    if raw.startswith("mm_ally"):
+        agent = raw.split(":", 1)[1] if ":" in raw else None
+        return ParsedLabel("mm_ally", normalize_agent(agent), False)
     if raw.startswith("ally"):
         agent = raw.split(":", 1)[1] if ":" in raw else None
         return ParsedLabel("viewport_ally", normalize_agent(agent), False)
-    # Default: anything else that names an enemy in the viewport.
+    # Default: anything else names an enemy in the viewport.
     agent = raw.split(":", 1)[1] if ":" in raw else None
     return ParsedLabel("viewport_enemy", normalize_agent(agent), True)
 
@@ -146,93 +159,108 @@ class YoloDetector(BaseDetector):
 
 
 # --- Synthetic backend ----------------------------------------------------
-# A couple of enemy "tracks" expressed as normalized map waypoints. The mock
-# walks enemies along these routes so last-known-position, rotation, and
-# site-pressure analysis all receive realistic, continuous signal.
-_ENEMY_TRACKS: list[dict] = [
-    {
-        "agent": "Jett",
-        "appear": 4.0,
-        "waypoints": [(0.50, 0.85), (0.50, 0.62), (0.40, 0.45), (0.22, 0.30), (0.18, 0.20)],
-        "duration": 26.0,
-    },
-    {
-        "agent": "Sova",
-        "appear": 9.0,
-        "waypoints": [(0.52, 0.88), (0.62, 0.66), (0.74, 0.52), (0.82, 0.34), (0.80, 0.22)],
-        "duration": 30.0,
-    },
-    {
-        "agent": "Killjoy",
-        "appear": 2.0,
-        "waypoints": [(0.80, 0.24), (0.80, 0.26), (0.78, 0.28)],  # holding a site
-        "duration": 40.0,
-    },
-]
+# A round-aware mock that produces a full, coherent scene (enemies + allies +
+# self + utilities + round metadata) so the whole Match-Intelligence dashboard
+# can be explored without a trained model. Enemies favour A site (with Killjoy
+# anchoring B and Sova holding mid) so cross-round patterns emerge.
+_ENEMY_AGENTS = ["Jett", "Omen", "Killjoy", "Sova", "Reyna"]
+_ALLY_AGENTS = ["Sage", "Phoenix", "Breach", "Brimstone", "KAY/O"]
+_SITE_ANCHORS = {"A": (0.20, 0.22), "B": (0.80, 0.24), "MID": (0.50, 0.50)}
+# Enemy site commitment per round — A-heavy, matching the example dashboard.
+_SITE_SCHEDULE = ["A", "A", "B", "A", "MID", "A", "B", "A", "A", "MID", "A", "B"]
 
 
 class MockDetector(BaseDetector):
-    """Deterministic synthetic detector for demos and tests.
-
-    It emits a steady ``mm_self`` marker plus revealed ``mm_enemy`` markers that
-    travel along predefined routes, projecting normalized map coordinates back
-    into minimap pixels through the calibration so the downstream transform is
-    genuinely exercised.
-    """
+    """Deterministic synthetic detector for demos and tests."""
 
     ready = True
 
     def __init__(self, calibration: MinimapCalibration | None = None) -> None:
         self.calibration = calibration or DEFAULT_CALIBRATION
+        self.round_number = 1
+
+    def set_round(self, round_number: int) -> None:
+        self.round_number = max(1, round_number)
+
+    def committed_site(self) -> str:
+        return _SITE_SCHEDULE[(self.round_number - 1) % len(_SITE_SCHEDULE)]
 
     def _map_to_pixel(self, u: float, v: float, w: int, h: int) -> tuple[float, float]:
         rx, ry, rw, rh = self.calibration.roi_pixels(w, h)
         return rx + u * rw, ry + v * rh
 
-    @staticmethod
-    def _walk(track: dict, t: float) -> tuple[float, float] | None:
-        appear = track["appear"]
-        duration = track["duration"]
-        if t < appear or t > appear + duration:
-            return None
-        pts = track["waypoints"]
-        if len(pts) == 1:
-            return pts[0]
-        frac = (t - appear) / duration
-        seg = frac * (len(pts) - 1)
-        i = min(int(seg), len(pts) - 2)
-        local = seg - i
-        (x0, y0), (x1, y1) = pts[i], pts[i + 1]
-        return x0 + (x1 - x0) * local, y0 + (y1 - y0) * local
+    def _enemy_targets(self) -> dict[str, tuple[float, float]]:
+        ax, ay = _SITE_ANCHORS[self.committed_site()]
+        targets = {a: (ax, ay) for a in ("Jett", "Omen", "Reyna")}
+        targets["Killjoy"] = _SITE_ANCHORS["B"]  # anchors B
+        targets["Sova"] = _SITE_ANCHORS["MID"]  # holds mid
+        return targets
+
+    def _marker(self, label: str, conf: float, u: float, v: float, w: int, h: int) -> RawDetection:
+        px, py = self._map_to_pixel(min(max(u, 0.02), 0.98), min(max(v, 0.02), 0.98), w, h)
+        return RawDetection(label, round(conf, 3), (px - 6, py - 6, 12, 12))
 
     def detect(self, frame: np.ndarray, frame_index: int, timestamp: float) -> list[RawDetection]:
         h, w = frame.shape[:2]
         out: list[RawDetection] = []
+        ease = min(1.0, timestamp / 20.0)
 
-        # Player marker drifts slowly near defender spawn / mid.
-        su = 0.5 + 0.05 * math.sin(timestamp / 7.0)
-        sv = 0.78 + 0.03 * math.cos(timestamp / 5.0)
-        spx, spy = self._map_to_pixel(su, sv, w, h)
-        out.append(RawDetection("mm_self", 0.99, (spx - 6, spy - 6, 12, 12)))
-
-        for track in _ENEMY_TRACKS:
-            pos = self._walk(track, timestamp)
-            if pos is None:
-                continue
-            # Reveals flicker: visible ~70% of the time once active.
-            if (int(timestamp * 2) + hash(track["agent"]) % 3) % 10 < 3:
-                continue
-            u, v = pos
-            px, py = self._map_to_pixel(u, v, w, h)
-            conf = 0.6 + 0.2 * math.sin(timestamp + len(track["agent"]))
-            out.append(
-                RawDetection(
-                    f"mm_enemy:{track['agent']}",
-                    round(min(max(conf, 0.4), 0.95), 3),
-                    (px - 6, py - 6, 12, 12),
-                )
+        # Player marker.
+        out.append(
+            self._marker(
+                "mm_self", 0.99,
+                0.5 + 0.03 * math.sin(timestamp / 5.0),
+                0.72 + 0.02 * math.cos(timestamp / 4.0), w, h,
             )
+        )
+
+        # Enemies ease from the defender side toward their per-round target.
+        for i, (agent, (tx, ty)) in enumerate(self._enemy_targets().items()):
+            sx, sy = (tx, ty) if agent == "Killjoy" else (0.5, 0.12)
+            u = sx + (tx - sx) * ease + 0.012 * math.sin(timestamp + i)
+            v = sy + (ty - sy) * ease + 0.012 * math.cos(timestamp + i)
+            if (int(timestamp) + i) % 7 == 0:  # reveal flicker
+                continue
+            conf = 0.55 + 0.25 * abs(math.sin(timestamp * 0.5 + i))
+            out.append(self._marker(f"mm_enemy:{agent}", conf, u, v, w, h))
+
+        # Teammates push from attacker spawn toward the contested site.
+        ax, ay = _SITE_ANCHORS[self.committed_site()]
+        for i, agent in enumerate(_ALLY_AGENTS):
+            sx, sy = 0.5 + (i - 2) * 0.03, 0.9
+            u = sx + (ax - sx) * ease
+            v = sy + (ay - sy) * ease
+            out.append(self._marker(f"mm_ally:{agent}", 0.95, u, v, w, h))
+
+        # Utilities become active a few seconds in.
+        if timestamp > 6.0:
+            for kind, agent, (ux, uy) in (
+                ("smoke", "Omen", (ax, ay)),
+                ("recon", "Sova", _SITE_ANCHORS["MID"]),
+                ("turret", "Killjoy", _SITE_ANCHORS["B"]),
+            ):
+                out.append(self._marker(f"util:{kind}:{agent}", 0.8, ux, uy, w, h))
         return out
+
+    def round_metadata(self, round_number: int) -> dict:
+        """Synthetic per-round HUD metadata (OCR is off for the mock backend)."""
+        a = min(13, 3 + round_number // 2)
+        b = min(13, 1 + round_number // 3)
+        economy = "Eco" if round_number % 4 == 2 else "Full Buy"
+        killfeed = [
+            {"t": 17.0, "killer": "Omen", "victim": "Sage", "weapon": "Vandal",
+             "headshot": True, "killer_team": "enemy"},
+            {"t": 24.0, "killer": "Phoenix", "victim": "Reyna", "weapon": "Phantom",
+             "headshot": False, "killer_team": "ally"},
+        ]
+        return {
+            "side": "attack",
+            "economy": economy,
+            "score_text": f"{a}-{b}",
+            "round_time": "1:12",
+            "spike_planted": False,
+            "killfeed": killfeed,
+        }
 
 
 class MinimapColorDetector(BaseDetector):
@@ -248,9 +276,9 @@ class MinimapColorDetector(BaseDetector):
 
     ready = True
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, calibration: MinimapCalibration | None = None) -> None:
         self.settings = settings
-        self.calibration = settings.minimap_calibration()
+        self.calibration = calibration or settings.minimap_calibration()
         self.sat_min = settings.minimap_enemy_sat_min
         self.val_min = settings.minimap_enemy_val_min
         self.hue_lo = settings.minimap_enemy_hue_lo

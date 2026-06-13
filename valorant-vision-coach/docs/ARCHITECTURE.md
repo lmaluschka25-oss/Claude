@@ -3,136 +3,98 @@
 ## Data flow
 
 ```
-            recorded match (.mp4)
-                    │
-                    ▼
-        ┌───────────────────────┐
-        │  VideoProcessor       │  OpenCV capture + frame sampling
-        │  (vision/)            │
-        │   ├─ Detector (YOLO)  │  enemies / agents / minimap markers
-        │   ├─ OcrEngine        │  timer / scoreboard / killfeed
-        │   └─ MinimapCalibration  minimap px → normalized map coords
-        └───────────┬───────────┘
-                    │  DetectionRecord / KillfeedRecord / RoundRecord
-                    ▼
-        ┌───────────────────────┐
-        │  Pipeline (services/) │  background worker, progress → DB
-        └───────────┬───────────┘
-                    ▼
-                 SQLite  ◀── matches, rounds, detections, killfeed
-                    │
-                    ▼
-        ┌───────────────────────┐
-        │  Analysis (analysis/) │  pure functions over detections
-        │   ├─ tracks           │  per-enemy sighting tracks
-        │   ├─ last_known       │  decay / staleness
-        │   ├─ rotation         │  graph dead-reckoning
-        │   └─ site_pressure    │  recency × proximity
-        └───────────┬───────────┘
-                    ▼
-              FastAPI REST  ──►  React dashboard (timeline + SVG map)
+        recording (one round)
+               │  POST /matches/{id}/rounds
+               ▼
+   ┌───────────────────────┐
+   │ Pipeline (services/)  │  background worker, per round
+   │  └ VideoProcessor     │  OpenCV sample → Detector → OCR
+   │       ├ Detector      │  mock | minimap-CV | YOLO
+   │       └ calibration   │  minimap px → normalized map coords
+   └───────────┬───────────┘
+               │ detections / utilities / killfeed + committed site
+               ▼
+            SQLite   Match 1──* Round 1──* {Detection, UtilityDetection, KillfeedEvent}
+               │
+               ▼  GET /matches/{id}/intelligence
+   ┌───────────────────────┐
+   │ intelligence.py       │  aggregate across all rounds of the match
+   │  memory · patterns ·  │
+   │  probabilities ·      │
+   │  heatmap · profiles · │
+   │  recommendation · log │
+   └───────────┬───────────┘
+               ▼
+        React dashboard (Analysis · Learnings · Settings)
 ```
 
-## Components
+## Data model (`models.py`)
 
-### Vision (`app/vision/`)
+```
+Match (competitive match: map, side, memory)
+  └─* Round (one uploaded recording = one round; status, committed_site, score, economy …)
+        ├─* Detection        (agent/enemy/ally/you sighting; team, source, map_x/y, callout)
+        ├─* UtilityDetection (smoke/recon/turret/… marker)
+        └─* KillfeedEvent    (killer, victim, weapon, headshot)
+```
 
-- **`detector.py`** — pluggable detection backends behind `BaseDetector`.
-  `YoloDetector` wraps Ultralytics (lazy import, fails soft); `MockDetector`
-  emits deterministic synthetic data so the whole system runs without weights.
-  Labels (`mm_self`, `mm_enemy:<agent>`, `enemy:<agent>`, …) carry the semantics
-  the processor interprets.
-- **`calibration.py`** — `MinimapCalibration` maps minimap pixels to normalized
-  `[0,1]` map coordinates, with per-side rotation/flip support.
-- **`ocr.py`** — optional HUD OCR (EasyOCR/Tesseract) for timer, scoreboard, and
-  killfeed; degrades to no-ops when unavailable.
-- **`maps.py`** — loads map metadata (callouts, sites, adjacency) and provides
-  geometry helpers: nearest callout, site centroid, and a Dijkstra `reachable`
-  walk used by rotation estimation.
+A round is processed once; its rows are immutable. Match-level intelligence is
+computed **on read** from all completed rounds, so confidence and patterns
+improve automatically as rounds are added.
+
+## Vision (`app/vision/`)
+
+- **`detector.py`** — `BaseDetector` with three backends:
+  - `MinimapColorDetector` — classical HSV segmentation of revealed red enemy
+    markers on the minimap (no model needed); ROI/colors are configurable.
+  - `MockDetector` — round-aware synthetic scene (enemies/allies/you/utilities +
+    HUD metadata) so the full dashboard runs without weights.
+  - `YoloDetector` — Ultralytics inference (lazy import, fails soft).
+- **`calibration.py`** — minimap-pixel → normalized `[0,1]` map coordinates.
+- **`maps.py`** — callouts, sites, and the rotation graph (11 maps); geometry
+  helpers incl. site centroids used to assign a sighting to a site.
+- **`ocr.py`** — optional HUD OCR (timer/score/killfeed).
 - **`video_processor.py`** — orchestrates capture → detect → OCR → coordinate
-  resolution → round segmentation, yielding plain records.
+  resolution, emitting plain records.
 
-### Analysis (`app/analysis/`)
+## Intelligence (`app/analysis/intelligence.py`)
 
-Every function is **pure** and consumes only `Detection` rows.
+`build_match_intelligence(session, match, settings, round_id=None)` computes the
+whole dashboard payload:
 
-- **`tracks.py`** — collapses many sightings into one `EnemyTrack` per agent
-  (last position, previous position for heading, age). Tracks older than the TTL
-  are dropped here — this is the "remove old sightings" rule.
-- **`last_known_position.py`** — formats tracks into last-known rows with age and
-  a `stale` flag.
-- **`rotation.py`** — see the model below.
-- **`site_pressure.py`** — see the model below.
-- **`engine.py`** — assembles a full `AnalysisSnapshot` for a moment `T`.
+- **Per-round committed site** — dominant enemy site from map-assigned sightings.
+- **Match memory** — site-presence shares, common utility, economy; confidence
+  scales with rounds (`0.2 + 0.12·rounds`, capped).
+- **Position probabilities** — next-round site distribution from a blend of base
+  rate, recency **momentum**, and a first-order **Markov** step.
+- **Patterns** — "Heavy A Presence", per-agent anchors ("Killjoy anchors B").
+- **Heatmap** — enemy positions binned to a normalized grid.
+- **Enemy profiles** — favored site + rotation tendency per agent.
+- **Recommendation** — the bomb site enemies commit to *least*, with reasons.
+- **Analysis log** — the 7 pipeline steps with real counts.
+- **Per-round scene** — minimap markers, timeline, live positions, detected info
+  (driven by the selected/`current` round).
 
-### Services (`app/services/`)
+## Services & API
 
-- **`pipeline.py`** — a single-worker `ThreadPoolExecutor` processes uploads
-  (serializing GPU/model access), streams progress into the DB, and persists
-  results. Swap in Celery/RQ for scale without touching `run()`.
-- **`match_service.py`** — query/persistence helpers.
+- **`pipeline.py`** — single-worker `ThreadPoolExecutor`; `run(round_id)`
+  processes a round, persists records, derives `committed_site` + metadata.
+- **`api/routes/matches.py`** — match CRUD, round upload, intelligence, plus
+  `rounds_router` for per-round detail/detections/video/minimap-preview.
 
-### API (`app/api/`) & Frontend (`frontend/`)
+## Frontend (`frontend/src/`)
 
-FastAPI routers expose matches, detections, killfeed, maps, system info, and the
-analysis endpoints. The React app polls processing status, then drives a
-timeline scrubber that re-queries the snapshot endpoint (throttled to ~5/s) and
-renders an SVG tactical map plus last-known / rotation / site-pressure panels.
+- **TopNav** → MATCHES / ANALYSIS / LEARNINGS / SETTINGS.
+- **ANALYSIS** composes the dashboard: `MatchSidebar` (match info + rounds +
+  uploader), `EnlargedMinimap`, `RoundVideo`, `RoundTimeline`, `Heatmap`, and the
+  panels in `panels.jsx` (detected info, utilities, live positions,
+  probabilities, patterns, match memory, enemy profiles, economy,
+  recommendation, reasoning, analysis log).
+- Polls `/intelligence` while rounds are processing.
 
-## Data model
+## Extending
 
-```
-Match 1───* Round
-  │           
-  ├──* Detection   (timestamp, agent, team, source, confidence, map_x/y, callout, bbox)
-  └──* KillfeedEvent (timestamp, killer, victim, weapon, headshot)
-```
-
-`Detection.source` is either `viewport` (seen in the 3D view; located by the
-player's own position) or `minimap` (a revealed marker; located directly).
-
-## The analysis models
-
-### Last known position
-
-For a query time `T` and TTL `τ`, take each enemy's most recent located sighting
-with timestamp ≤ `T`. `age = T − last_seen`. Sightings with `age > τ` are
-dropped (or flagged `stale` if `include_stale` is requested). Simple, and it
-mirrors what a human remembers: "where did I last see them, and how long ago?"
-
-### Rotation estimation
-
-Transparent dead-reckoning over the callout graph:
-
-1. **Reach** = `movement_speed × age` (normalized units). An enemy last seen
-   longer ago could be further away.
-2. **Reachable callouts** = Dijkstra from the last-seen callout, bounded by
-   reach (edge weights = Euclidean distance between connected callouts).
-3. **Score** each candidate by three interpretable factors:
-   - *progress* — a Gaussian centered on the full-speed frontier (`reach`), so
-     destinations consistent with continued movement rank higher;
-   - *heading* — alignment with the enemy's last observed movement direction;
-   - *objective* — a bonus for callouts that lead onto a bomb site.
-4. Keep the top few, normalize into a likelihood distribution, and report ETA
-   (`distance / speed`) per candidate.
-
-No hidden state is used — it is the same reasoning a coach does from the footage.
-
-### Site pressure
-
-For each site, gather enemy sightings within the TTL window and within the site
-radius. Each contributes `recency × proximity × confidence`, where recency is an
-exponential decay and proximity falls off linearly to the radius edge. Multiple
-sightings of one agent are de-duplicated to their strongest contribution, then
-summed and squashed to `[0,1]` via `1 − e^(−raw/K)`. Output includes the
-weighted headcount and the contributing callouts.
-
-## Extension points
-
-- **New detector** — implement `BaseDetector.detect` and wire it in
-  `build_detector`.
-- **New map** — add a JSON file under `data/maps/` (see SETUP.md).
-- **New analysis** — add a pure function over detections and surface it via a
-  route + dashboard panel.
-- **Scale processing** — replace the thread-pool executor in `pipeline.py` with a
-  task queue.
+- **New detector** → implement `BaseDetector.detect`, wire into `build_detector`.
+- **New map** → add JSON under `data/maps/` (see SETUP.md).
+- **New analysis** → add a section builder in `intelligence.py` + a panel.
+- **Scale** → swap the thread-pool for Celery/RQ; `run(round_id)` is unchanged.
