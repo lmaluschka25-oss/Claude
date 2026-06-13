@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 from app.analysis.last_known_position import to_last_known
-from app.analysis.rotation import estimate_rotations
 from app.analysis.prediction import predict_next_round
+from app.analysis.rotation import estimate_rotations
 from app.analysis.site_pressure import estimate_site_pressure
 from app.analysis.tendencies import build_tendencies
 from app.analysis.tracks import build_enemy_tracks

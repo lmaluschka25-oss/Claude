@@ -235,12 +235,76 @@ class MockDetector(BaseDetector):
         return out
 
 
+class MinimapColorDetector(BaseDetector):
+    """Classical computer-vision detector for revealed enemies on the minimap.
+
+    No trained model required: it crops the minimap region (from calibration)
+    and finds red enemy markers by HSV color segmentation, returning each blob
+    centroid as an ``mm_enemy`` detection in full-frame pixels. Agent identity
+    is not recovered (markers carry no name), but positions are real — enough to
+    drive the map-based site analysis. Enemies appear on your minimap only when
+    legitimately revealed in-game, so this reads nothing hidden.
+    """
+
+    ready = True
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.calibration = settings.minimap_calibration()
+        self.sat_min = settings.minimap_enemy_sat_min
+        self.val_min = settings.minimap_enemy_val_min
+        self.min_area = settings.minimap_min_area
+        self.max_area = settings.minimap_max_area
+
+    def find_enemies(self, frame: np.ndarray) -> list[RawDetection]:
+        """Return enemy-marker detections (also used by the calibration preview)."""
+        import cv2
+
+        h, w = frame.shape[:2]
+        rx, ry, rw, rh = self.calibration.roi_pixels(w, h)
+        roi = frame[ry : ry + rh, rx : rx + rw]
+        if roi.size == 0:
+            return []
+
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        lower1 = np.array([0, self.sat_min, self.val_min])
+        upper1 = np.array([10, 255, 255])
+        lower2 = np.array([168, self.sat_min, self.val_min])
+        upper2 = np.array([179, 255, 255])
+        mask = cv2.inRange(hsv, lower1, upper1) | cv2.inRange(hsv, lower2, upper2)
+        kernel = np.ones((2, 2), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        detections: list[RawDetection] = []
+        for c in contours:
+            area = cv2.contourArea(c)
+            if not (self.min_area <= area <= self.max_area):
+                continue
+            m = cv2.moments(c)
+            if m["m00"] == 0:
+                continue
+            cx = rx + m["m10"] / m["m00"]
+            cy = ry + m["m01"] / m["m00"]
+            # More on-target color + plausible size → higher confidence.
+            conf = max(0.45, min(0.9, 0.5 + area / (self.max_area * 2.0)))
+            detections.append(RawDetection("mm_enemy", round(conf, 3), (cx - 5, cy - 5, 10, 10)))
+        return detections
+
+    def detect(self, frame: np.ndarray, frame_index: int, timestamp: float) -> list[RawDetection]:
+        return self.find_enemies(frame)
+
+
 def build_detector(settings: Settings) -> BaseDetector:
     """Construct the configured detector backend."""
     backend = settings.detector_backend.lower()
     if backend == "mock":
         logger.info("Using MockDetector (synthetic detections).")
         return MockDetector()
+    if backend == "minimap":
+        logger.info("Using MinimapColorDetector (classical CV on the minimap).")
+        return MinimapColorDetector(settings)
     detector = YoloDetector(settings)
     if not detector.ready:
         logger.warning(

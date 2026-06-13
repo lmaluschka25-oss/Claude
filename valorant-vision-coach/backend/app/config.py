@@ -58,6 +58,21 @@ class Settings(BaseSettings):
     # OCR backend for killfeed / scoreboard / timer: "easyocr" | "tesseract" | "off".
     ocr_backend: str = "easyocr"
 
+    # ---- Minimap calibration (color-based minimap detector) -------------
+    # The minimap rectangle as fractions of the frame, plus per-side
+    # rotation/flip. Tune these to your HUD with the /minimap-preview endpoint.
+    minimap_x_frac: float = 0.012
+    minimap_y_frac: float = 0.012
+    minimap_w_frac: float = 0.182
+    minimap_h_frac: float = 0.324
+    minimap_rotation: int = 0
+    minimap_flip_x: bool = False
+    # Red enemy-marker color gate (HSV) and blob-area bounds (pixels).
+    minimap_enemy_sat_min: int = 110
+    minimap_enemy_val_min: int = 90
+    minimap_min_area: float = 3.0
+    minimap_max_area: float = 900.0
+
     # ---- Analysis defaults ----------------------------------------------
     # A sighting older than this (seconds) is considered stale and dropped
     # from the "last known position" view. Overridable per request.
@@ -67,6 +82,19 @@ class Settings(BaseSettings):
     movement_speed_norm: float = 0.13
     # Site-pressure radius (normalized units) around a site centroid.
     site_pressure_radius: float = 0.22
+
+    def minimap_calibration(self):
+        """Build a MinimapCalibration from the configured fractions."""
+        from .vision.calibration import MinimapCalibration
+
+        return MinimapCalibration(
+            x_frac=self.minimap_x_frac,
+            y_frac=self.minimap_y_frac,
+            w_frac=self.minimap_w_frac,
+            h_frac=self.minimap_h_frac,
+            rotation=self.minimap_rotation,
+            flip_x=self.minimap_flip_x,
+        )
 
     @property
     def sqlite_path(self) -> Path | None:

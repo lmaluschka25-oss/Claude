@@ -122,6 +122,53 @@ def get_killfeed(match_id: int, session: Session = Depends(get_session)) -> list
     return [KillfeedOut.model_validate(k) for k in match_service.get_killfeed(session, match_id)]
 
 
+@router.get("/{match_id}/minimap-preview")
+def minimap_preview(
+    match_id: int,
+    t: float = 0.0,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+) -> Response:
+    """Return a PNG of one frame with the minimap ROI box + detected enemy dots.
+
+    Use this to calibrate: the green box should sit exactly on the minimap and
+    the red circles on the enemy markers. Adjust the VVC_MINIMAP_* settings until
+    it lines up.
+    """
+    match = _require_match(session, match_id)
+    import cv2  # lazy heavy import
+
+    from ...vision.detector import MinimapColorDetector
+
+    cap = cv2.VideoCapture(match.stored_path)
+    if not cap.isOpened():
+        raise HTTPException(status_code=500, detail="Video konnte nicht geöffnet werden.")
+    cap.set(cv2.CAP_PROP_POS_MSEC, max(t, 0.0) * 1000.0)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        raise HTTPException(status_code=404, detail="Frame an dieser Stelle nicht lesbar.")
+
+    h, w = frame.shape[:2]
+    rx, ry, rw, rh = settings.minimap_calibration().roi_pixels(w, h)
+    detector = MinimapColorDetector(settings)
+    dets = detector.find_enemies(frame)
+
+    cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
+    for d in dets:
+        cx, cy = d.center
+        cv2.circle(frame, (int(cx), int(cy)), 9, (0, 0, 255), 2)
+    cv2.putText(
+        frame, f"enemies: {len(dets)}", (rx, max(ry - 8, 14)),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2,
+    )
+
+    ok, buf = cv2.imencode(".png", frame)
+    if not ok:
+        raise HTTPException(status_code=500, detail="PNG-Encoding fehlgeschlagen.")
+    return Response(content=buf.tobytes(), media_type="image/png")
+
+
 def _require_match(session: Session, match_id: int):
     match = match_service.get_match(session, match_id)
     if match is None:

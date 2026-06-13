@@ -71,7 +71,9 @@ def run(match_id: int, settings: Settings | None = None) -> None:
         detector = _get_detector(cfg.detector_backend)
         ocr = _get_ocr(cfg.ocr_backend)
         game_map = load_map(map_name) if map_name else None
-        processor = VideoProcessor(cfg, detector, ocr=ocr, game_map=game_map)
+        processor = VideoProcessor(
+            cfg, detector, ocr=ocr, game_map=game_map, calibration=cfg.minimap_calibration()
+        )
 
         def progress_cb(fraction: float, detail: str) -> None:
             with session_scope() as session:
