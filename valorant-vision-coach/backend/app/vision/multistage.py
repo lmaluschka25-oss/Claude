@@ -306,6 +306,10 @@ class MultiStageMinimapDetector(BaseDetector):
                 peaks.append((x + t.shape[1] / 2.0, y + t.shape[0] / 2.0, float(res[y, x])))
         peaks = self._nms(peaks, TEMPLATE_SIZE * 0.7)
 
+        # A clearly strong match against a patch the *user taught* is, on its
+        # own, enough to confirm — that is the whole point of teaching. Motion
+        # is only a bonus here (the single-frame preview has no history).
+        strong_bar = max(self.template_threshold + 0.08, 0.66)
         cands = []
         for cx, cy, score in peaks:
             x = int(max(0, cx - TEMPLATE_SIZE / 2))
@@ -313,21 +317,35 @@ class MultiStageMinimapDetector(BaseDetector):
             w = min(TEMPLATE_SIZE, w_roi - x)
             h = min(TEMPLATE_SIZE, h_roi - y)
             cand = {"cx": cx, "cy": cy, "x": x, "y": y, "w": w, "h": h, "hsv": hsv, "gray": gray}
-            color = self._color_cue(cand)
-            if color is None or color[0] is None:
-                continue  # teammate-coloured icon → not an enemy
+
+            col = self._color_cue(cand)
+            if col is None or col[0] is None:
+                # Reads teammate-coloured — but the user taught this as an enemy,
+                # so keep it (training overrides colour) with no colour credit and
+                # a mild caution penalty instead of dropping it outright.
+                color_score, color_reason, teammate = 0.0, "teammate-hue (overridden by training)", True
+            else:
+                color_score, color_reason, teammate = col[0], col[1], False
+
             patch = cv2.resize(gray[y : y + h, x : x + w], (TEMPLATE_SIZE, TEMPLATE_SIZE))
             penalty = 0.3 * max(0.0, min(1.0, (self._best_false(patch) - 0.3) / 0.6))
-            tmpl = W_TEMPLATE * max(0.0, min(1.0, (score - 0.3) / 0.6))
-            motion, seen = self._motion_cue(cand)
+            if teammate:
+                penalty += 0.08
+            # Anchor template credit to the user's strictness slider: passing the
+            # bar already means "accepted" (0.6 of the weight); a perfect match
+            # gives the full weight.
+            norm = (score - self.template_threshold) / max(1e-3, 1.0 - self.template_threshold)
+            tmpl = W_TEMPLATE * (0.6 + 0.4 * max(0.0, min(1.0, norm)))
+            motion, seen = self._motion_cue(cand)  # bonus only
             shape = W_SHAPE * 0.6  # matched a real icon shape
-            total = max(0.0, color[0] + shape + tmpl + motion - penalty)
+            total = max(0.0, color_score + shape + tmpl + motion - penalty)
             cand["total"] = total
-            cand["scores"] = {"color": round(color[0], 3), "shape": round(shape, 3),
+            cand["strong"] = bool(score >= strong_bar)
+            cand["scores"] = {"color": round(color_score, 3), "shape": round(shape, 3),
                               "template": round(tmpl, 3), "motion": round(motion, 3),
                               "penalty": round(penalty, 3), "total": round(total, 3),
                               "frames_seen": seen}
-            cand["reasons"] = {"color": color[1], "template": f"match {score:.2f}"}
+            cand["reasons"] = {"color": color_reason, "template": f"match {score:.2f}"}
             cands.append(cand)
         self._history.append([(c["cx"], c["cy"]) for c in cands])
         return cands
@@ -351,7 +369,7 @@ class MultiStageMinimapDetector(BaseDetector):
         thr = self._effective_threshold()
         out = []
         for cand in self._detect_candidates(roi):
-            if cand["total"] < thr:
+            if cand["total"] < thr and not cand.get("strong"):
                 continue
             cx, cy = rx + cand["cx"], ry + cand["cy"]
             out.append(RawDetection("mm_enemy", round(cand["total"], 3),
@@ -376,7 +394,7 @@ class MultiStageMinimapDetector(BaseDetector):
         thr = self.threshold
         items = []
         for cand in self._detect_candidates(roi):
-            confirmed = cand["total"] >= thr
+            confirmed = cand["total"] >= thr or cand.get("strong", False)
             if not confirmed and cand["total"] < min_total:
                 continue  # hide low-signal noise from the overlay
             items.append({

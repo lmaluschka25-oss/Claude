@@ -73,6 +73,49 @@ def test_template_matching_finds_taught_icon_elsewhere():
         shutil.rmtree(tdir, ignore_errors=True)
 
 
+def test_taught_icon_confirms_in_single_frame_without_motion():
+    """A strong match against a user-taught template confirms on its own — even
+    on a single frame with no motion history (the case of the Settings preview)."""
+    import shutil
+
+    from app.vision.multistage import templates_dir
+
+    tdir = templates_dir(SETTINGS)
+    try:
+        cx, cy = _roi_center()
+        frame = _cross(cx, cy)
+        assert MultiStageMinimapDetector(SETTINGS).teach(frame, cx, cy, "enemy")
+
+        det = MultiStageMinimapDetector(SETTINGS)
+        assert det._enemy_tmpl
+        dets = det.find_enemies(frame)  # ONE frame → motion cue is 0
+        assert any(abs(d.center[0] - cx) < 16 and abs(d.center[1] - cy) < 16 for d in dets)
+    finally:
+        shutil.rmtree(tdir, ignore_errors=True)
+
+
+def test_training_overrides_teammate_colour():
+    """Cold-start excludes teammate-green; but once the user explicitly teaches a
+    green-ish icon as an enemy, a strong template match confirms it anyway."""
+    import shutil
+
+    from app.vision.multistage import templates_dir
+
+    tdir = templates_dir(SETTINGS)
+    try:
+        cx, cy = _roi_center()
+        green = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(green, (cx - 4, cy - 1), (cx + 4, cy + 1), (0, 200, 0), -1)
+        cv2.rectangle(green, (cx - 1, cy - 4), (cx + 1, cy + 4), (0, 200, 0), -1)
+        assert MultiStageMinimapDetector(SETTINGS).teach(green, cx, cy, "enemy")
+
+        det = MultiStageMinimapDetector(SETTINGS)
+        dets = det.find_enemies(green)
+        assert any(abs(d.center[0] - cx) < 16 and abs(d.center[1] - cy) < 16 for d in dets)
+    finally:
+        shutil.rmtree(tdir, ignore_errors=True)
+
+
 def test_multistage_debug_reports_candidates_with_scores():
     det = MultiStageMinimapDetector(SETTINGS)
     cx, cy = _roi_center()
