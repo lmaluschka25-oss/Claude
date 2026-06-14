@@ -46,6 +46,9 @@ class CalibrationSettings(BaseModel):
     recommendation_min_confidence: float | None = None
     timeline_detail: int | None = None
     detection_confirm_threshold: float | None = None
+    detection_template_threshold: float | None = None
+    detection_motion_frames: int | None = None
+    detection_max_templates: int | None = None
 
 
 class MatchSummary(ORMModel):

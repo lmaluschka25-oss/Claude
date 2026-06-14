@@ -38,6 +38,58 @@ def templates_dir(settings: Settings) -> Path:
     return settings.upload_dir.parent / "templates"
 
 
+# ---- learnable-template introspection (what the user has taught) ---------
+def _safe_name(name: str) -> bool:
+    return name.endswith(".png") and "/" not in name and "\\" not in name and ".." not in name
+
+
+def list_templates(settings: Settings) -> dict:
+    """All taught template filenames, split by label (newest last)."""
+    base = templates_dir(settings)
+
+    def names(sub: str) -> list[str]:
+        d = base / sub
+        return sorted(p.name for p in d.glob("*.png")) if d.exists() else []
+
+    return {"enemy": names("enemy"), "false": names("false")}
+
+
+def template_path(settings: Settings, label: str, name: str) -> Path | None:
+    sub = "false" if label == "false" else "enemy"
+    if not _safe_name(name):
+        return None
+    p = templates_dir(settings) / sub / name
+    return p if p.exists() else None
+
+
+def delete_template(settings: Settings, label: str, name: str) -> bool:
+    p = template_path(settings, label, name)
+    if p is None:
+        return False
+    try:
+        p.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def clear_templates(settings: Settings) -> int:
+    """Forget everything the user taught. Returns how many patches were removed."""
+    base = templates_dir(settings)
+    removed = 0
+    for sub in ("enemy", "false"):
+        d = base / sub
+        if not d.exists():
+            continue
+        for p in d.glob("*.png"):
+            try:
+                p.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
+
+
 def _enemy_hue(h: int, color_mode: str, hue_min: int, hue_max: int) -> bool:
     mode = (color_mode or "auto").lower()
     if mode == "red":
@@ -69,7 +121,10 @@ class MultiStageMinimapDetector(BaseDetector):
         self.min_area = settings.minimap_min_area
         self.max_area = settings.minimap_max_area
         self.threshold = getattr(settings, "detection_confirm_threshold", 0.62)
-        self._history: deque = deque(maxlen=6)  # recent frames' centroids (ROI px)
+        self.template_threshold = float(getattr(settings, "detection_template_threshold", 0.58))
+        self.max_templates = int(getattr(settings, "detection_max_templates", 12))
+        self.motion_frames = max(1, int(getattr(settings, "detection_motion_frames", 6)))
+        self._history: deque = deque(maxlen=self.motion_frames)  # recent centroids (ROI px)
         self._enemy_tmpl, self._false_tmpl = self._load_templates()
 
     def reset(self) -> None:
@@ -83,7 +138,9 @@ class MultiStageMinimapDetector(BaseDetector):
             d = templates_dir(self.settings) / sub
             out = []
             if d.exists():
-                for p in sorted(d.glob("*.png"))[:60]:
+                # Keep only the newest N (perf cap): the most recently taught
+                # patches are matched per frame, the dominant per-frame cost.
+                for p in sorted(d.glob("*.png"))[-self.max_templates:]:
                     img = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
                     if img is not None:
                         out.append(cv2.resize(img, (TEMPLATE_SIZE, TEMPLATE_SIZE)))
@@ -244,7 +301,7 @@ class MultiStageMinimapDetector(BaseDetector):
             if t.shape[0] >= h_roi or t.shape[1] >= w_roi:
                 continue
             res = cv2.matchTemplate(gray, t, cv2.TM_CCOEFF_NORMED)
-            ys, xs = np.where(res >= 0.55)
+            ys, xs = np.where(res >= self.template_threshold)
             for y, x in zip(ys, xs, strict=False):
                 peaks.append((x + t.shape[1] / 2.0, y + t.shape[0] / 2.0, float(res[y, x])))
         peaks = self._nms(peaks, TEMPLATE_SIZE * 0.7)

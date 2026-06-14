@@ -149,7 +149,7 @@ def _normalize_video(path: str) -> str:
     out = os.path.splitext(path)[0] + ".norm.mp4"
     try:
         subprocess.run(
-            [ffmpeg, "-y", "-i", path, "-c:v", "libx264", "-preset", "veryfast",
+            [ffmpeg, "-y", "-i", path, "-c:v", "libx264", "-preset", "ultrafast",
              "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", out],
             check=True, capture_output=True, timeout=900,
         )

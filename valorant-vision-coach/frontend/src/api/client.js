@@ -30,6 +30,13 @@ export const api = {
   saveCalibration: (body) =>
     req("/system/calibration", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
   resetCalibration: () => req("/system/calibration", { method: "DELETE" }),
+
+  // Learnable templates (what the detector knows from training).
+  listTemplates: () => req("/system/templates"),
+  templateUrl: (label, name) => `${BASE}/system/templates/${label}/${name}`,
+  deleteTemplate: (label, name) => req(`/system/templates/${label}/${name}`, { method: "DELETE" }),
+  clearTemplates: () => req("/system/templates", { method: "DELETE" }),
+
   reanalyzeRound: (id) => req(`/rounds/${id}/reanalyze`, { method: "POST" }),
   teachRound: (id, { t = 0, x, y, label = "enemy", roi = false }) =>
     req(`/rounds/${id}/teach?t=${t}&x=${x}&y=${y}&label=${label}&roi=${roi ? 1 : 0}`, { method: "POST" }),
@@ -52,9 +59,14 @@ export const api = {
   minimapPreviewUrl: (id, opts = {}) => {
     const p = new URLSearchParams({ t: opts.t ?? 0 });
     if (opts.mask) p.set("mask", "1");
+    if (opts.crop) p.set("crop", "1");
+    if (opts.clean) p.set("clean", "1");
     for (const k of ["x_frac", "y_frac", "w_frac", "h_frac", "sat_min", "val_min", "hue_min", "hue_max", "color_mode"]) {
       if (opts[k] != null) p.set(k, opts[k]);
     }
+    // Live threshold overrides (settings keys → endpoint param names).
+    if (opts.detection_confirm_threshold != null) p.set("confirm_threshold", opts.detection_confirm_threshold);
+    if (opts.detection_template_threshold != null) p.set("template_threshold", opts.detection_template_threshold);
     return `${BASE}/rounds/${id}/minimap-preview?${p.toString()}`;
   },
 

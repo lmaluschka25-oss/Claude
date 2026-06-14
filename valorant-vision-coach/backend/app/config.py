@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     # Multi-stage detector: confirm an enemy only when the weighted confidence
     # (colour ≤.20 + shape ≤.25 + template ≤.35 + motion ≤.20) reaches this.
     detection_confirm_threshold: float = 0.62
+    # Template-matching tunables (learnable enemy/false icon templates).
+    # Higher threshold = stricter match (fewer, surer hits). Motion frames =
+    # how many recent frames a marker must persist across (steadier, less
+    # flicker). Max templates caps how many learned patches are matched per
+    # frame — the dominant per-frame cost, so keep it modest for speed.
+    detection_template_threshold: float = 0.58
+    detection_motion_frames: int = 6
+    detection_max_templates: int = 12
 
     # ---- Advanced detection / analysis settings (user-tunable, persisted) ---
     # Each maps to a real parameter and measurably changes analysis output.

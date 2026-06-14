@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { cx, pct } from "../util.js";
 
@@ -14,6 +14,27 @@ function Slider({ s, set, k, label, min, max, step, fmt }) {
   );
 }
 
+// Gallery of taught patches for one label. Module-level so it doesn't remount
+// (and refetch thumbnails) on every settings change. The newest `cap` are the
+// ones actually matched per frame; older ones are dimmed as "unused".
+function Gallery({ label, names, cap, onDelete }) {
+  if (names.length === 0) return <div className="tpl-gallery"><span className="muted small">none yet</span></div>;
+  return (
+    <div className="tpl-gallery">
+      {names.map((name, i) => {
+        const active = i >= names.length - cap;
+        return (
+          <div key={name} className={cx("tpl-thumb", !active && "inactive")}
+               title={active ? `${label} template (in use)` : `${label} template (beyond cap — not matched)`}>
+            <img src={api.templateUrl(label, name)} alt={`${label} ${name}`} />
+            <button className="tpl-del" onClick={() => onDelete(label, name)} title="Forget this one">✕</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SettingsView({ info, intelligence, calibrationRound, onReanalyze }) {
   const [s, setS] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -24,10 +45,25 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
   const [teachLabel, setTeachLabel] = useState("enemy");
   const [pkey, setPkey] = useState(0);
   const [taught, setTaught] = useState(null);
+  const [templates, setTemplates] = useState({ enemy: [], false: [], enemy_count: 0, false_count: 0 });
+  // Debounced snapshot of the preview-affecting inputs so dragging a slider
+  // doesn't fire a video-decode request on every tick (keeps the UI snappy).
+  const [pv, setPv] = useState(null);
 
   useEffect(() => {
     api.getCalibration().then(setS).catch(() => setS(null));
   }, []);
+
+  const refreshTemplates = useCallback(() => {
+    api.listTemplates().then(setTemplates).catch(() => {});
+  }, []);
+  useEffect(() => { refreshTemplates(); }, [refreshTemplates]);
+
+  useEffect(() => {
+    if (!s) return undefined;
+    const id = setTimeout(() => setPv({ s, t, mask, zoom }), 300);
+    return () => clearTimeout(id);
+  }, [s, t, mask, zoom]);
 
   const set = (k, v) => { setS((p) => ({ ...p, [k]: v })); setSaved(false); };
 
@@ -56,9 +92,10 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
 
   const stats = intelligence?.detection_stats;
   const round = calibrationRound;
-  const previewSrc = round
-    ? `${api.minimapPreviewUrl(round.id, { t, mask, crop: zoom, ...s })}&_=${pkey}`
+  const previewSrc = round && pv
+    ? `${api.minimapPreviewUrl(round.id, { t: pv.t, mask: pv.mask, crop: pv.zoom, ...pv.s })}&_=${pkey}`
     : null;
+  const cap = templates.active_cap ?? s.detection_max_templates ?? 12;
 
   async function onTeach(e) {
     if (!round) return;
@@ -66,13 +103,33 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
     const x = ((e.clientX - r.left) / r.width).toFixed(4);
     const y = ((e.clientY - r.top) / r.height).toFixed(4);
     try {
-      await api.teachRound(round.id, { t, x, y, label: teachLabel, roi: zoom });
+      const res = await api.teachRound(round.id, { t, x, y, label: teachLabel, roi: zoom });
       setTaught(teachLabel);
+      if (res) setTemplates((p) => ({ ...p, enemy_count: res.enemy_count, false_count: res.false_count }));
       setPkey((k) => k + 1);
+      refreshTemplates();
     } catch {
       setTaught("error");
     }
   }
+
+  async function delTemplate(label, name) {
+    try {
+      await api.deleteTemplate(label, name);
+      refreshTemplates();
+      setPkey((k) => k + 1);
+    } catch { /* ignore */ }
+  }
+
+  async function forgetAll() {
+    if (!confirm("Forget everything the detector learned from your training? This cannot be undone.")) return;
+    try {
+      await api.clearTemplates();
+      refreshTemplates();
+      setPkey((k) => k + 1);
+    } catch { /* ignore */ }
+  }
+
   const statusColor = { ok: "good", low: "amber", none: "bad" }[stats?.status] || "muted";
 
   // Honest live warnings about the current settings.
@@ -82,6 +139,8 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
   if (s.confidence_threshold > 0.85) warnings.push("Confidence threshold is high — many detections will be dropped.");
   if (s.hue_max - s.hue_min > 60) warnings.push("Color band is very wide — expect false positives.");
   if (s.analysis_interval >= 2) warnings.push("Analysis interval is coarse (≥2s) — brief sightings may be skipped.");
+  if (s.detection_max_templates > 24) warnings.push("Matching many templates per frame is slower — lower it if analysis drags.");
+  if (templates.enemy_count === 0) warnings.push("No enemy templates taught yet — click real enemy pings below with “✓ Enemy” so the detector can learn them.");
 
   return (
     <div className="view settings-view">
@@ -98,7 +157,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
             <div><span className="fb-label">Last round markers</span><span className={cx("fb-val", statusColor)}>{stats?.enemy_markers ?? "—"}</span></div>
             <div><span className="fb-label">Avg confidence</span><span className="fb-val">{stats ? pct(stats.avg_confidence) : "—"}</span></div>
             <div><span className="fb-label">Frames analyzed</span><span className="fb-val">{stats?.frames_analyzed ?? "—"}</span></div>
-            <div><span className="fb-label">Status</span><span className={cx("fb-val", statusColor)}>{(stats?.status || "—").toUpperCase()}</span></div>
+            <div><span className="fb-label">Taught (enemy / false)</span><span className="fb-val">{templates.enemy_count} / {templates.false_count}</span></div>
           </div>
           {stats?.message && <div className={cx("fb-msg", statusColor)}>{stats.message}</div>}
           {warnings.map((w, i) => <div className="fb-warn" key={i}>⚠ {w}</div>)}
@@ -121,7 +180,6 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
           <Slider s={s} set={set} k="memory_weight" label="Match memory weight (overall)" min={0} max={1} step={0.02} fmt={pct} />
           <Slider s={s} set={set} k="recommendation_min_confidence" label="Recommendation min confidence" min={0} max={1} step={0.05} fmt={pct} />
           <Slider s={s} set={set} k="timeline_detail" label="Timeline detail (max events)" min={4} max={20} step={1} />
-          <Slider s={s} set={set} k="detection_confirm_threshold" label="Enemy confirm threshold (color+shape+template+motion)" min={0.3} max={0.95} step={0.01} fmt={pct} />
         </div>
       </div>
 
@@ -143,9 +201,10 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
               </label>
             </div>
             <div className="muted small" style={{ marginTop: 4 }}>
-              Green ring = confirmed enemy (number = confidence %). Until you teach
-              a few templates, almost nothing is confirmed (on purpose — no spam).
-              Click directly on real enemy pings with “✓ Enemy” to teach them.
+              Green ring = confirmed enemy (number = confidence %). Pick <b>✓ Enemy</b> and click
+              directly on a real enemy ping to teach it; pick <b>✕ False</b> and click a wrong
+              spot to teach the detector to ignore it. Each click trains it — what it has learned
+              shows in <b>LEARNED TEMPLATES</b> below.
             </div>
             {round && (
               <div className="teach-row">
@@ -155,7 +214,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
                 <button className={cx("seg-btn", teachLabel === "false" && "on")}
                         onClick={() => setTeachLabel("false")}>✕ False</button>
                 {taught && <span className={cx("small", taught === "error" ? "bad" : "good")}>
-                  {taught === "error" ? "failed" : `taught: ${taught}`}</span>}
+                  {taught === "error" ? "failed" : `taught: ${taught} (${templates.enemy_count}✓ / ${templates.false_count}✕)`}</span>}
               </div>
             )}
           </div>
@@ -180,6 +239,10 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
             <Slider s={s} set={set} k="val_min" label="brightness min" min={0} max={255} step={1} />
             <Slider s={s} set={set} k="min_area" label="min blob size" min={1} max={40} step={1} />
             <Slider s={s} set={set} k="max_area" label="max blob size" min={40} max={800} step={10} />
+            <div className="sub-label">Detection confidence</div>
+            <Slider s={s} set={set} k="detection_confirm_threshold" label="Enemy confirm threshold (all cues)" min={0.3} max={0.95} step={0.01} fmt={pct} />
+            <Slider s={s} set={set} k="detection_template_threshold" label="Template match strictness" min={0.3} max={0.9} step={0.01} fmt={pct} />
+            <Slider s={s} set={set} k="detection_motion_frames" label="Motion persistence (frames)" min={1} max={12} step={1} />
             <div className="sub-label">Minimap box (green) — put it on the minimap</div>
             <Slider s={s} set={set} k="x_frac" label="x" min={0} max={0.6} step={0.002} fmt={(v) => v.toFixed(3)} />
             <Slider s={s} set={set} k="y_frac" label="y" min={0} max={0.6} step={0.002} fmt={(v) => v.toFixed(3)} />
@@ -192,6 +255,34 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
               </label>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ---- Learned templates (what training produced) ---- */}
+      <div className="panel">
+        <div className="panel-head">
+          <h3>LEARNED TEMPLATES</h3>
+          <span className="muted small">{templates.enemy_count} enemy · {templates.false_count} false</span>
+        </div>
+        <div className="panel-body">
+          <div className="muted small" style={{ marginBottom: 8 }}>
+            These are the patches the detector learned from your clicks. Enemy patches are matched
+            against the minimap to find enemies; false patches suppress look-alikes. The newest
+            <b> {cap}</b> of each are used per frame (the cap below — fewer = faster). Click ✕ to
+            forget a mistake. Dimmed = beyond the cap, currently unused.
+          </div>
+          <div className="sub-label">Enemy ({templates.enemy_count})</div>
+          <Gallery label="enemy" names={templates.enemy} cap={cap} onDelete={delTemplate} />
+          <div className="sub-label" style={{ marginTop: 8 }}>False / ignore ({templates.false_count})</div>
+          <Gallery label="false" names={templates.false} cap={cap} onDelete={delTemplate} />
+          <div style={{ marginTop: 12 }}>
+            <Slider s={s} set={set} k="detection_max_templates" label="Templates matched per frame (speed ↔ accuracy)" min={1} max={40} step={1} />
+          </div>
+          {(templates.enemy_count > 0 || templates.false_count > 0) && (
+            <button className="btn ghost danger" style={{ marginTop: 8 }} onClick={forgetAll}>
+              Forget all training
+            </button>
+          )}
         </div>
       </div>
 

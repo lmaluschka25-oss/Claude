@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
@@ -35,6 +36,37 @@ _VIDEO_MIME = {
     ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
     ".mkv": "video/x-matroska", ".avi": "video/x-msvideo",
 }
+
+# Small LRU cache of decoded preview frames. Opening + seeking a VideoCapture
+# is the slow part; tuning colour/threshold sliders re-runs only detection on
+# the cached frame, so the Settings preview stays snappy instead of re-decoding
+# the video on every slider tick.
+_FRAME_CACHE: OrderedDict[tuple, object] = OrderedDict()
+_FRAME_CACHE_MAX = 8
+
+
+def _read_frame_at(path: str, t: float):
+    """Decode the frame at time ``t`` (seconds), memoizing recent results."""
+    import cv2
+
+    key = (path, round(max(t, 0.0), 2))
+    cached = _FRAME_CACHE.get(key)
+    if cached is not None:
+        _FRAME_CACHE.move_to_end(key)
+        return cached.copy()
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        return None
+    cap.set(cv2.CAP_PROP_POS_MSEC, max(t, 0.0) * 1000.0)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        return None
+    _FRAME_CACHE[key] = frame.copy()
+    _FRAME_CACHE.move_to_end(key)
+    while len(_FRAME_CACHE) > _FRAME_CACHE_MAX:
+        _FRAME_CACHE.popitem(last=False)
+    return frame
 
 
 # ---- Matches -------------------------------------------------------------
@@ -165,6 +197,8 @@ def minimap_preview(
     hue_min: int | None = None,
     hue_max: int | None = None,
     color_mode: str | None = None,
+    confirm_threshold: float | None = None,
+    template_threshold: float | None = None,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> Response:
@@ -179,13 +213,8 @@ def minimap_preview(
     from ...services import calibration_store
     from ...vision.calibration import MinimapCalibration
 
-    cap = cv2.VideoCapture(rnd.stored_path)
-    if not cap.isOpened():
-        raise HTTPException(status_code=500, detail="Could not open video.")
-    cap.set(cv2.CAP_PROP_POS_MSEC, max(t, 0.0) * 1000.0)
-    ok, frame = cap.read()
-    cap.release()
-    if not ok or frame is None:
+    frame = _read_frame_at(rnd.stored_path, t)
+    if frame is None:
         raise HTTPException(status_code=404, detail="Frame not readable here.")
 
     s = calibration_store.load(settings)  # saved settings as the base
@@ -211,6 +240,10 @@ def minimap_preview(
         detector.sat_floor = max(40, sat_min - 70)
     if val_min is not None:
         detector.val_floor = max(60, val_min - 60)
+    if confirm_threshold is not None:
+        detector.threshold = float(confirm_threshold)
+    if template_threshold is not None:
+        detector.template_threshold = float(template_threshold)
 
     fh, fw = frame.shape[:2]
     rx, ry, rw, rh = calib.roi_pixels(fw, fh)
@@ -273,18 +306,12 @@ def teach_round(
     learnable template store used by the multi-stage detector.
     """
     rnd = _require_round(session, round_id)
-    import cv2
-
     from ...services import calibration_store
+    from ...vision import multistage
     from ...vision.multistage import MultiStageMinimapDetector
 
-    cap = cv2.VideoCapture(rnd.stored_path)
-    if not cap.isOpened():
-        raise HTTPException(status_code=500, detail="Could not open video.")
-    cap.set(cv2.CAP_PROP_POS_MSEC, max(t, 0.0) * 1000.0)
-    ok, frame = cap.read()
-    cap.release()
-    if not ok or frame is None:
+    frame = _read_frame_at(rnd.stored_path, t)
+    if frame is None:
         raise HTTPException(status_code=404, detail="Frame not readable here.")
     fh, fw = frame.shape[:2]
     calib = calibration_store.calibration(settings)
@@ -295,7 +322,12 @@ def teach_round(
         px, py = x * fw, y * fh
     det = MultiStageMinimapDetector(settings, calibration=calib)
     saved = det.teach(frame, px, py, "false" if label == "false" else "enemy")
-    return {"saved": bool(saved), "label": label, "px": round(px, 1), "py": round(py, 1)}
+    counts = multistage.list_templates(settings)
+    return {
+        "saved": bool(saved), "label": label,
+        "px": round(px, 1), "py": round(py, 1),
+        "enemy_count": len(counts["enemy"]), "false_count": len(counts["false"]),
+    }
 
 
 @rounds_router.get("/{round_id}/video")

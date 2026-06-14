@@ -15,7 +15,8 @@ FIELDS = (
     "color_mode", "hue_min", "hue_max", "sat_min", "val_min", "min_area", "max_area",
     "analysis_interval", "confidence_threshold", "pattern_weight",
     "memory_weight", "recommendation_min_confidence", "timeline_detail",
-    "detection_confirm_threshold",
+    "detection_confirm_threshold", "detection_template_threshold",
+    "detection_motion_frames", "detection_max_templates",
 )
 
 
@@ -45,6 +46,9 @@ def defaults(settings: Settings) -> dict:
         "recommendation_min_confidence": settings.recommendation_min_confidence,
         "timeline_detail": settings.timeline_detail,
         "detection_confirm_threshold": settings.detection_confirm_threshold,
+        "detection_template_threshold": settings.detection_template_threshold,
+        "detection_motion_frames": settings.detection_motion_frames,
+        "detection_max_templates": settings.detection_max_templates,
     }
 
 
@@ -103,6 +107,19 @@ def apply_to_multistage(detector, settings: Settings) -> None:
     detector.min_area = float(d["min_area"])
     detector.max_area = float(d["max_area"])
     detector.threshold = float(d.get("detection_confirm_threshold", detector.threshold))
+    detector.template_threshold = float(
+        d.get("detection_template_threshold", getattr(detector, "template_threshold", 0.58))
+    )
+    detector.max_templates = int(
+        d.get("detection_max_templates", getattr(detector, "max_templates", 12))
+    )
+    mf = max(1, int(d.get("detection_motion_frames", getattr(detector, "motion_frames", 6))))
+    detector.motion_frames = mf
+    from collections import deque
+
+    detector._history = deque(detector._history, maxlen=mf)
+    # Reload templates so a changed max-templates cap takes effect immediately.
+    detector._enemy_tmpl, detector._false_tmpl = detector._load_templates()
 
 
 def apply_to_detector(detector, settings: Settings) -> None:

@@ -20,6 +20,10 @@ from .ocr import OcrEngine
 
 logger = get_logger(__name__)
 
+# OCR is expensive; run it at most this often (seconds of video) regardless of
+# how fast we sample frames for detection. Keeps HUD reading cheap at high fps.
+OCR_INTERVAL = 1.5
+
 
 @dataclass
 class DetectionRecord:
@@ -116,6 +120,7 @@ class VideoProcessor:
         out = ProcessOutput(duration_seconds=duration, fps=fps, frame_count=frame_count)
         last_self: tuple[float, float] | None = None
         last_self_ts = -999.0
+        last_ocr_ts = -999.0
         processed = 0
         frame_idx = -1
 
@@ -161,8 +166,13 @@ class VideoProcessor:
                         continue
                     self._consume(det, parsed, timestamp, frame_idx, w, h, last_self, last_self_ts, out)
 
-                if self.ocr is not None and self.ocr.ready:
+                if (
+                    self.ocr is not None
+                    and self.ocr.ready
+                    and timestamp - last_ocr_ts >= OCR_INTERVAL
+                ):
                     self._read_hud(frame, timestamp, out)
+                    last_ocr_ts = timestamp
 
                 processed += 1
                 if progress_cb and frame_count:
@@ -238,8 +248,6 @@ class VideoProcessor:
         )
 
     def _read_hud(self, frame, timestamp, out: ProcessOutput) -> None:
-        if int(timestamp) == int(timestamp - 0.5):  # ~once per second of video
-            return
         score = self.ocr.read_score(frame)
         if score:
             out.score_text = score
