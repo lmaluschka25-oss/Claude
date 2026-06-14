@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     minimap_enemy_val_min: int = 140
     minimap_min_area: float = 4.0
     minimap_max_area: float = 260.0
+    # Multi-stage detector: confirm an enemy only when the weighted confidence
+    # (colour ≤.20 + shape ≤.25 + template ≤.35 + motion ≤.20) reaches this.
+    detection_confirm_threshold: float = 0.62
 
     # ---- Advanced detection / analysis settings (user-tunable, persisted) ---
     # Each maps to a real parameter and measurably changes analysis output.

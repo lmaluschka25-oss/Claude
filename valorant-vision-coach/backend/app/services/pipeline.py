@@ -27,7 +27,7 @@ from ..models import (
     UtilityKind,
 )
 from ..vision.calibration import DEFAULT_CALIBRATION
-from ..vision.detector import MinimapColorDetector, MockDetector, build_detector
+from ..vision.detector import MinimapColorDetector, build_detector
 from ..vision.maps import list_maps, load_map
 from ..vision.ocr import OcrEngine
 from ..vision.video_processor import ProcessOutput, VideoProcessor
@@ -79,19 +79,29 @@ def run(round_id: int, settings: Settings | None = None) -> None:
 
     try:
         video_path = _normalize_video(video_path)
-        detector = _get_detector(cfg.detector_backend)
         ocr = _get_ocr(cfg.ocr_backend)
         game_map = load_map(map_name) if map_name else None
+        store = calibration_store.load(cfg)
         metadata: dict = {}
-        if isinstance(detector, MockDetector):
+        backend = cfg.detector_backend.lower()
+        if backend == "mock":
+            detector = _get_detector("mock")
             detector.set_round(round_number)
             metadata = detector.round_metadata(round_number)
             calib = DEFAULT_CALIBRATION  # mock emits markers at the default ROI
+        elif backend in ("minimap", "multistage"):
+            # Fresh per round so frame-tracking state is clean.
+            from ..vision.multistage import MultiStageMinimapDetector
+
+            detector = MultiStageMinimapDetector(cfg, calibration_store.calibration(cfg))
+            calibration_store.apply_to_multistage(detector, cfg)
+            detector.reset()
+            calib = detector.calibration
         else:
+            detector = _get_detector(cfg.detector_backend)
             if isinstance(detector, MinimapColorDetector):
                 calibration_store.apply_to_detector(detector, cfg)
             calib = calibration_store.calibration(cfg)
-        store = calibration_store.load(cfg)
         interval = float(store.get("analysis_interval", 0.5))
         conf_threshold = float(store.get("confidence_threshold", 0.0))
         processor = VideoProcessor(

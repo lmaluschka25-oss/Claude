@@ -15,6 +15,7 @@ FIELDS = (
     "color_mode", "hue_min", "hue_max", "sat_min", "val_min", "min_area", "max_area",
     "analysis_interval", "confidence_threshold", "pattern_weight",
     "memory_weight", "recommendation_min_confidence", "timeline_detail",
+    "detection_confirm_threshold",
 )
 
 
@@ -43,6 +44,7 @@ def defaults(settings: Settings) -> dict:
         "memory_weight": settings.memory_weight,
         "recommendation_min_confidence": settings.recommendation_min_confidence,
         "timeline_detail": settings.timeline_detail,
+        "detection_confirm_threshold": settings.detection_confirm_threshold,
     }
 
 
@@ -87,6 +89,20 @@ def calibration(settings: Settings):
         w_frac=float(d["w_frac"]), h_frac=float(d["h_frac"]),
         rotation=int(d["rotation"]), flip_x=bool(d["flip_x"]),
     )
+
+
+def apply_to_multistage(detector, settings: Settings) -> None:
+    """Push saved color/area/threshold onto a MultiStageMinimapDetector."""
+    d = load(settings)
+    detector.calibration = calibration(settings)
+    detector.color_mode = str(d.get("color_mode", "auto"))
+    detector.hue_min = int(d["hue_min"])
+    detector.hue_max = int(d["hue_max"])
+    detector.sat_floor = max(50, int(d["sat_min"]) - 70)
+    detector.val_floor = max(70, int(d["val_min"]) - 60)
+    detector.min_area = float(d["min_area"])
+    detector.max_area = float(d["max_area"])
+    detector.threshold = float(d.get("detection_confirm_threshold", detector.threshold))
 
 
 def apply_to_detector(detector, settings: Settings) -> None:

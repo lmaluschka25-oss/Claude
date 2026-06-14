@@ -155,6 +155,7 @@ def minimap_preview(
     t: float = 0.0,
     mask: bool = False,
     crop: bool = False,
+    clean: bool = False,
     x_frac: float | None = None,
     y_frac: float | None = None,
     w_frac: float | None = None,
@@ -177,7 +178,6 @@ def minimap_preview(
 
     from ...services import calibration_store
     from ...vision.calibration import MinimapCalibration
-    from ...vision.detector import MinimapColorDetector
 
     cap = cv2.VideoCapture(rnd.stored_path)
     if not cap.isOpened():
@@ -196,26 +196,37 @@ def minimap_preview(
         h_frac=h_frac if h_frac is not None else s["h_frac"],
         rotation=int(s["rotation"]), flip_x=bool(s["flip_x"]),
     )
-    detector = MinimapColorDetector(settings, calibration=calib)
-    detector.color_mode = color_mode or str(s.get("color_mode", "auto"))
-    detector.hue_min = hue_min if hue_min is not None else int(s["hue_min"])
-    detector.hue_max = hue_max if hue_max is not None else int(s["hue_max"])
-    detector.sat_min = sat_min if sat_min is not None else int(s["sat_min"])
-    detector.val_min = val_min if val_min is not None else int(s["val_min"])
-    detector.min_area = float(s["min_area"])
-    detector.max_area = float(s["max_area"])
+    from ...vision.multistage import MultiStageMinimapDetector
 
-    if mask:
-        frame = detector.mask_overlay(frame)
+    detector = MultiStageMinimapDetector(settings, calibration=calib)
+    calibration_store.apply_to_multistage(detector, settings)
+    detector.calibration = calib
+    if color_mode:
+        detector.color_mode = color_mode
+    if hue_min is not None:
+        detector.hue_min = hue_min
+    if hue_max is not None:
+        detector.hue_max = hue_max
+    if sat_min is not None:
+        detector.sat_floor = max(40, sat_min - 70)
+    if val_min is not None:
+        detector.val_floor = max(60, val_min - 60)
+
     fh, fw = frame.shape[:2]
     rx, ry, rw, rh = calib.roi_pixels(fw, fh)
-    dets = detector.find_enemies(frame)
-    cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
-    for d in dets:
-        cx, cy = d.center
-        cv2.circle(frame, (int(cx), int(cy)), 8, (0, 0, 255), 2)
-    cv2.putText(frame, f"enemies: {len(dets)}", (rx, max(ry - 8, 14)),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    if not clean:
+        _rx, _ry, cands = detector.debug_candidates(frame)
+        cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
+        confirmed = 0
+        for c in cands:
+            col = (0, 200, 0) if c["confirmed"] else (60, 60, 255)
+            confirmed += 1 if c["confirmed"] else 0
+            cv2.circle(frame, (int(c["cx"]), int(c["cy"])), 8, col, 2)
+            cv2.putText(frame, str(int(c["total"] * 100)),
+                        (int(c["cx"]) + 8, int(c["cy"]) - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, col, 1)
+        cv2.putText(frame, f"enemies: {confirmed} (green=confirmed, red=rejected)",
+                    (rx, max(ry - 8, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
 
     if crop and rw > 0 and rh > 0:
         pad = 6
@@ -245,6 +256,40 @@ def reanalyze_round(round_id: int, session: Session = Depends(get_session)) -> R
     session.refresh(rnd)
     pipeline.submit(rnd.id)
     return RoundOut.model_validate(rnd)
+
+
+@rounds_router.post("/{round_id}/teach")
+def teach_round(
+    round_id: int,
+    t: float = 0.0,
+    x: float = 0.5,
+    y: float = 0.5,
+    label: str = "enemy",
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings_dep),
+) -> dict:
+    """Save a template at normalized point (x,y) as a confirmed enemy / false +.
+
+    Feeds the learnable template store used by the multi-stage detector.
+    """
+    rnd = _require_round(session, round_id)
+    import cv2
+
+    from ...services import calibration_store
+    from ...vision.multistage import MultiStageMinimapDetector
+
+    cap = cv2.VideoCapture(rnd.stored_path)
+    if not cap.isOpened():
+        raise HTTPException(status_code=500, detail="Could not open video.")
+    cap.set(cv2.CAP_PROP_POS_MSEC, max(t, 0.0) * 1000.0)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        raise HTTPException(status_code=404, detail="Frame not readable here.")
+    fh, fw = frame.shape[:2]
+    det = MultiStageMinimapDetector(settings, calibration=calibration_store.calibration(settings))
+    saved = det.teach(frame, x * fw, y * fh, "false" if label == "false" else "enemy")
+    return {"saved": bool(saved), "label": label}
 
 
 @rounds_router.get("/{round_id}/video")

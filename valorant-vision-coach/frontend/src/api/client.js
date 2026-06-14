@@ -31,6 +31,8 @@ export const api = {
     req("/system/calibration", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
   resetCalibration: () => req("/system/calibration", { method: "DELETE" }),
   reanalyzeRound: (id) => req(`/rounds/${id}/reanalyze`, { method: "POST" }),
+  teachRound: (id, { t = 0, x, y, label = "enemy" }) =>
+    req(`/rounds/${id}/teach?t=${t}&x=${x}&y=${y}&label=${label}`, { method: "POST" }),
   listMaps: () => req("/maps"),
   getMap: (name) => req(`/maps/${name}`),
 

@@ -45,6 +45,7 @@ class CalibrationSettings(BaseModel):
     memory_weight: float | None = None
     recommendation_min_confidence: float | None = None
     timeline_detail: int | None = None
+    detection_confirm_threshold: float | None = None
 
 
 class MatchSummary(ORMModel):

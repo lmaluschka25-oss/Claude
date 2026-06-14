@@ -20,6 +20,9 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
   const [busy, setBusy] = useState(false);
   const [mask, setMask] = useState(true);
   const [t, setT] = useState(2);
+  const [teachLabel, setTeachLabel] = useState("enemy");
+  const [pkey, setPkey] = useState(0);
+  const [taught, setTaught] = useState(null);
 
   useEffect(() => {
     api.getCalibration().then(setS).catch(() => setS(null));
@@ -52,7 +55,21 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
 
   const stats = intelligence?.detection_stats;
   const round = calibrationRound;
-  const previewSrc = round ? api.minimapPreviewUrl(round.id, { t, mask, ...s }) : null;
+  const previewSrc = round ? `${api.minimapPreviewUrl(round.id, { t, mask, ...s })}&_=${pkey}` : null;
+
+  async function onTeach(e) {
+    if (!round) return;
+    const r = e.target.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width).toFixed(4);
+    const y = ((e.clientY - r.top) / r.height).toFixed(4);
+    try {
+      await api.teachRound(round.id, { t, x, y, label: teachLabel });
+      setTaught(teachLabel);
+      setPkey((k) => k + 1);
+    } catch {
+      setTaught("error");
+    }
+  }
   const statusColor = { ok: "good", low: "amber", none: "bad" }[stats?.status] || "muted";
 
   // Honest live warnings about the current settings.
@@ -101,6 +118,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
           <Slider s={s} set={set} k="memory_weight" label="Match memory weight (overall)" min={0} max={1} step={0.02} fmt={pct} />
           <Slider s={s} set={set} k="recommendation_min_confidence" label="Recommendation min confidence" min={0} max={1} step={0.05} fmt={pct} />
           <Slider s={s} set={set} k="timeline_detail" label="Timeline detail (max events)" min={4} max={20} step={1} />
+          <Slider s={s} set={set} k="detection_confirm_threshold" label="Enemy confirm threshold (color+shape+template+motion)" min={0.3} max={0.95} step={0.01} fmt={pct} />
         </div>
       </div>
 
@@ -109,11 +127,26 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
         <div className="panel-head"><h3>ENEMY DETECTION & MINIMAP</h3></div>
         <div className="panel-body calib">
           <div className="calib-preview">
-            {round ? <img src={previewSrc} alt="detection preview" />
-                   : <div className="empty small">Analyze a round to preview detection here.</div>}
-            <label className="check-row" style={{ marginTop: 8 }}>
-              <input type="checkbox" checked={mask} onChange={(e) => setMask(e.target.checked)} /> Color mask
-            </label>
+            {round ? (
+              <img src={previewSrc} alt="detection preview" onClick={onTeach}
+                   style={{ cursor: "crosshair" }} title="Click a marker to teach the detector" />
+            ) : (
+              <div className="empty small">Analyze a round to preview detection here.</div>
+            )}
+            <div className="muted small" style={{ marginTop: 6 }}>
+              Green = confirmed enemy, red = rejected. Numbers = confidence %.
+            </div>
+            {round && (
+              <div className="teach-row">
+                <span className="muted small">Click image to teach:</span>
+                <button className={cx("seg-btn", teachLabel === "enemy" && "on")}
+                        onClick={() => setTeachLabel("enemy")}>✓ Enemy</button>
+                <button className={cx("seg-btn", teachLabel === "false" && "on")}
+                        onClick={() => setTeachLabel("false")}>✕ False</button>
+                {taught && <span className={cx("small", taught === "error" ? "bad" : "good")}>
+                  {taught === "error" ? "failed" : `taught: ${taught}`}</span>}
+              </div>
+            )}
           </div>
           <div className="calib-controls">
             <div className="sub-label">Enemy color</div>

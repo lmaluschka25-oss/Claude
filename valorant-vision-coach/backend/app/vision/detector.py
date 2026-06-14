@@ -36,6 +36,7 @@ class RawDetection:
     label: str
     confidence: float
     bbox: tuple[float, float, float, float]  # x, y, w, h in frame pixels
+    meta: dict | None = None  # per-cue scores / reasons (multi-stage detector)
 
     @property
     def center(self) -> tuple[float, float]:
@@ -375,8 +376,13 @@ def build_detector(settings: Settings) -> BaseDetector:
     if backend == "mock":
         logger.info("Using MockDetector (synthetic detections).")
         return MockDetector()
-    if backend == "minimap":
-        logger.info("Using MinimapColorDetector (classical CV on the minimap).")
+    if backend in ("minimap", "multistage"):
+        from .multistage import MultiStageMinimapDetector
+
+        logger.info("Using MultiStageMinimapDetector (shape+template+motion+colour).")
+        return MultiStageMinimapDetector(settings)
+    if backend == "color":
+        logger.info("Using MinimapColorDetector (colour-only, legacy).")
         return MinimapColorDetector(settings)
     detector = YoloDetector(settings)
     if not detector.ready:
