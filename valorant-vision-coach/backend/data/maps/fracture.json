@@ -1,0 +1,35 @@
+{
+  "name": "fracture",
+  "display_name": "Fracture",
+  "image": "fracture.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.74, "y": 0.50, "site": "A"},
+    {"id": "a_main", "name": "A Main", "x": 0.74, "y": 0.30},
+    {"id": "a_hall", "name": "A Hall", "x": 0.66, "y": 0.50},
+    {"id": "a_drop", "name": "A Drop", "x": 0.82, "y": 0.40},
+    {"id": "a_dish", "name": "A Dish", "x": 0.82, "y": 0.60},
+    {"id": "a_rope", "name": "A Rope", "x": 0.74, "y": 0.72},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.50},
+    {"id": "mid_canteen", "name": "Canteen", "x": 0.44, "y": 0.45},
+    {"id": "mid_tower", "name": "Tower", "x": 0.56, "y": 0.42},
+    {"id": "b_site", "name": "B Site", "x": 0.26, "y": 0.50, "site": "B"},
+    {"id": "b_main", "name": "B Main", "x": 0.26, "y": 0.30},
+    {"id": "b_hall", "name": "B Hall", "x": 0.34, "y": 0.50},
+    {"id": "b_arcade", "name": "Arcade", "x": 0.34, "y": 0.64},
+    {"id": "b_tower", "name": "B Tower", "x": 0.20, "y": 0.40},
+    {"id": "attacker_spawn_top", "name": "Attacker Spawn (Top)", "x": 0.50, "y": 0.08},
+    {"id": "attacker_spawn_bottom", "name": "Attacker Spawn (Bottom)", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.62}
+  ],
+  "edges": [
+    ["attacker_spawn_top", "a_main"], ["attacker_spawn_top", "b_main"], ["attacker_spawn_top", "mid_tower"],
+    ["attacker_spawn_bottom", "a_rope"], ["attacker_spawn_bottom", "b_arcade"], ["attacker_spawn_bottom", "mid"],
+    ["a_main", "a_drop"], ["a_drop", "a_site"], ["a_main", "a_hall"], ["a_hall", "a_site"],
+    ["a_dish", "a_site"], ["a_rope", "a_dish"],
+    ["mid_tower", "mid"], ["mid", "mid_canteen"], ["mid", "a_hall"], ["mid_canteen", "b_hall"],
+    ["b_main", "b_tower"], ["b_tower", "b_site"], ["b_main", "b_hall"], ["b_hall", "b_site"],
+    ["b_arcade", "b_site"],
+    ["defender_spawn", "a_hall"], ["defender_spawn", "b_hall"], ["defender_spawn", "mid"]
+  ]
+}

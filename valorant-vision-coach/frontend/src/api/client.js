@@ -1,0 +1,100 @@
+// API client for the Match Intelligence platform.
+const BASE = import.meta.env.VITE_API_BASE || "/api";
+
+async function req(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      detail = (await res.json()).detail || detail;
+    } catch {
+      /* non-JSON */
+    }
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+function jsonBody(body) {
+  return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
+
+export const api = {
+  base: BASE,
+  systemInfo: () => req("/system/info"),
+  getCalibration: () => req("/system/calibration"),
+  saveCalibration: (body) =>
+    req("/system/calibration", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+  resetCalibration: () => req("/system/calibration", { method: "DELETE" }),
+
+  // Learnable templates (what the detector knows from training).
+  listTemplates: () => req("/system/templates"),
+  templateUrl: (label, name) => `${BASE}/system/templates/${label}/${name}`,
+  deleteTemplate: (label, name) => req(`/system/templates/${label}/${name}`, { method: "DELETE" }),
+  clearTemplates: () => req("/system/templates", { method: "DELETE" }),
+
+  reanalyzeRound: (id) => req(`/rounds/${id}/reanalyze`, { method: "POST" }),
+  teachRound: (id, { t = 0, x, y, label = "enemy", roi = false }) =>
+    req(`/rounds/${id}/teach?t=${t}&x=${x}&y=${y}&label=${label}&roi=${roi ? 1 : 0}`, { method: "POST" }),
+  listMaps: () => req("/maps"),
+  getMap: (name) => req(`/maps/${name}`),
+
+  listMatches: () => req("/matches"),
+  createMatch: (body) => req("/matches", jsonBody(body)),
+  getMatch: (id) => req(`/matches/${id}`),
+  updateMatch: (id, body) =>
+    req(`/matches/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+  deleteMatch: (id) => req(`/matches/${id}`, { method: "DELETE" }),
+  listRounds: (id) => req(`/matches/${id}/rounds`),
+  getIntelligence: (id, roundId) =>
+    req(`/matches/${id}/intelligence${roundId ? `?round_id=${roundId}` : ""}`),
+
+  getRound: (id) => req(`/rounds/${id}`),
+  deleteRound: (id) => req(`/rounds/${id}`, { method: "DELETE" }),
+  roundVideoUrl: (id) => `${BASE}/rounds/${id}/video`,
+  minimapPreviewUrl: (id, opts = {}) => {
+    const p = new URLSearchParams({ t: opts.t ?? 0 });
+    if (opts.mask) p.set("mask", "1");
+    if (opts.crop) p.set("crop", "1");
+    if (opts.clean) p.set("clean", "1");
+    for (const k of ["x_frac", "y_frac", "w_frac", "h_frac", "sat_min", "val_min", "hue_min", "hue_max", "color_mode"]) {
+      if (opts[k] != null) p.set(k, opts[k]);
+    }
+    // Live threshold overrides (settings keys → endpoint param names).
+    if (opts.detection_confirm_threshold != null) p.set("confirm_threshold", opts.detection_confirm_threshold);
+    if (opts.detection_template_threshold != null) p.set("template_threshold", opts.detection_template_threshold);
+    return `${BASE}/rounds/${id}/minimap-preview?${p.toString()}`;
+  },
+
+  // Upload a round recording to a match (XHR for progress).
+  uploadRound(matchId, file, mapName, onProgress) {
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (mapName) form.append("map_name", mapName);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${BASE}/matches/${matchId}/rounds`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+        else {
+          let detail = xhr.statusText;
+          try {
+            detail = JSON.parse(xhr.responseText).detail || detail;
+          } catch {
+            /* ignore */
+          }
+          reject(new Error(`${xhr.status}: ${detail}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.send(form);
+    });
+  },
+};

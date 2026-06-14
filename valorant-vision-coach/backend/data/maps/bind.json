@@ -1,0 +1,35 @@
+{
+  "name": "bind",
+  "display_name": "Bind",
+  "image": "bind.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.24, "y": 0.26, "site": "A"},
+    {"id": "a_short", "name": "A Short", "x": 0.34, "y": 0.40},
+    {"id": "a_lamps", "name": "A Lamps", "x": 0.18, "y": 0.18},
+    {"id": "a_bath", "name": "A Bath", "x": 0.30, "y": 0.30},
+    {"id": "a_link", "name": "A Link", "x": 0.40, "y": 0.52},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.42, "y": 0.80},
+    {"id": "hookah", "name": "Hookah", "x": 0.60, "y": 0.30},
+    {"id": "b_site", "name": "B Site", "x": 0.74, "y": 0.28, "site": "B"},
+    {"id": "b_long", "name": "B Long", "x": 0.80, "y": 0.50},
+    {"id": "b_short", "name": "B Short", "x": 0.64, "y": 0.46},
+    {"id": "b_window", "name": "B Window", "x": 0.68, "y": 0.36},
+    {"id": "b_lobby", "name": "B Lobby", "x": 0.66, "y": 0.82},
+    {"id": "tp_a", "name": "A Teleporter", "x": 0.56, "y": 0.62},
+    {"id": "tp_b", "name": "B Teleporter", "x": 0.50, "y": 0.40},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.54, "y": 0.94},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.08}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "b_lobby"],
+    ["a_lobby", "a_link"], ["a_link", "a_short"], ["a_link", "tp_a"],
+    ["a_short", "a_site"], ["a_short", "a_bath"],
+    ["a_bath", "a_site"], ["a_site", "a_lamps"],
+    ["a_site", "hookah"], ["hookah", "b_window"], ["hookah", "b_short"],
+    ["b_lobby", "b_long"], ["b_long", "b_site"], ["b_short", "b_site"],
+    ["b_window", "b_site"], ["b_short", "b_window"],
+    ["tp_a", "b_short"], ["tp_b", "a_link"], ["tp_b", "hookah"],
+    ["defender_spawn", "a_lamps"], ["defender_spawn", "b_site"]
+  ]
+}

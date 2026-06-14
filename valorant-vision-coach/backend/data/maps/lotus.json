@@ -1,0 +1,33 @@
+{
+  "name": "lotus",
+  "display_name": "Lotus",
+  "image": "lotus.png",
+  "sites": ["A", "B", "C"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.80, "y": 0.30, "site": "A"},
+    {"id": "a_main", "name": "A Main", "x": 0.78, "y": 0.60},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.74, "y": 0.82},
+    {"id": "a_rubble", "name": "A Rubble", "x": 0.70, "y": 0.45},
+    {"id": "a_link", "name": "A Link", "x": 0.62, "y": 0.40},
+    {"id": "b_site", "name": "B Site", "x": 0.50, "y": 0.28, "site": "B"},
+    {"id": "b_main", "name": "B Main", "x": 0.50, "y": 0.62},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.50},
+    {"id": "mid_top", "name": "Mid Top", "x": 0.50, "y": 0.40},
+    {"id": "c_site", "name": "C Site", "x": 0.20, "y": 0.30, "site": "C"},
+    {"id": "c_main", "name": "C Main", "x": 0.22, "y": 0.60},
+    {"id": "c_lobby", "name": "C Lobby", "x": 0.26, "y": 0.82},
+    {"id": "c_mound", "name": "C Mound", "x": 0.30, "y": 0.45},
+    {"id": "c_link", "name": "C Link", "x": 0.38, "y": 0.40},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.10}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "b_main"], ["attacker_spawn", "c_lobby"],
+    ["a_lobby", "a_main"], ["a_main", "a_rubble"], ["a_rubble", "a_site"], ["a_main", "a_link"],
+    ["a_link", "mid_top"], ["a_link", "a_site"],
+    ["b_main", "mid"], ["mid", "mid_top"], ["b_main", "b_site"], ["mid_top", "b_site"],
+    ["c_lobby", "c_main"], ["c_main", "c_mound"], ["c_mound", "c_site"], ["c_main", "c_link"],
+    ["c_link", "mid_top"], ["c_link", "c_site"],
+    ["a_site", "defender_spawn"], ["b_site", "defender_spawn"], ["c_site", "defender_spawn"]
+  ]
+}

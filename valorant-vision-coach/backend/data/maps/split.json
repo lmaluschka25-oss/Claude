@@ -1,0 +1,34 @@
+{
+  "name": "split",
+  "display_name": "Split",
+  "image": "split.png",
+  "sites": ["A", "B"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.74, "y": 0.30, "site": "A"},
+    {"id": "a_main", "name": "A Main", "x": 0.72, "y": 0.60},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.70, "y": 0.82},
+    {"id": "a_ramp", "name": "A Ramps", "x": 0.66, "y": 0.45},
+    {"id": "a_tower", "name": "A Tower", "x": 0.80, "y": 0.40},
+    {"id": "a_screens", "name": "A Screens", "x": 0.62, "y": 0.40},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.55},
+    {"id": "mid_mail", "name": "Mail", "x": 0.46, "y": 0.48},
+    {"id": "mid_vent", "name": "Vents", "x": 0.50, "y": 0.42},
+    {"id": "ropes", "name": "Ropes", "x": 0.50, "y": 0.34},
+    {"id": "b_site", "name": "B Site", "x": 0.26, "y": 0.32, "site": "B"},
+    {"id": "b_main", "name": "B Main", "x": 0.28, "y": 0.60},
+    {"id": "b_lobby", "name": "B Lobby", "x": 0.30, "y": 0.82},
+    {"id": "b_tower", "name": "B Tower", "x": 0.20, "y": 0.40},
+    {"id": "b_link", "name": "B Link", "x": 0.38, "y": 0.45},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.12}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "b_lobby"], ["attacker_spawn", "mid"],
+    ["a_lobby", "a_main"], ["a_main", "a_ramp"], ["a_ramp", "a_site"], ["a_site", "a_tower"],
+    ["a_main", "a_screens"], ["a_screens", "mid"],
+    ["mid", "mid_mail"], ["mid", "mid_vent"], ["mid_vent", "ropes"], ["ropes", "a_tower"],
+    ["ropes", "b_tower"], ["mid_mail", "b_link"],
+    ["b_lobby", "b_main"], ["b_main", "b_link"], ["b_link", "b_site"], ["b_site", "b_tower"],
+    ["b_tower", "defender_spawn"], ["defender_spawn", "a_tower"], ["defender_spawn", "ropes"]
+  ]
+}

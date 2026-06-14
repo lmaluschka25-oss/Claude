@@ -1,0 +1,34 @@
+{
+  "name": "haven",
+  "display_name": "Haven",
+  "image": "haven.png",
+  "sites": ["A", "B", "C"],
+  "callouts": [
+    {"id": "a_site", "name": "A Site", "x": 0.80, "y": 0.28, "site": "A"},
+    {"id": "a_long", "name": "A Long", "x": 0.82, "y": 0.55},
+    {"id": "a_short", "name": "A Short", "x": 0.70, "y": 0.45},
+    {"id": "a_lobby", "name": "A Lobby", "x": 0.74, "y": 0.80},
+    {"id": "garage", "name": "Garage", "x": 0.58, "y": 0.55},
+    {"id": "b_site", "name": "B Site", "x": 0.50, "y": 0.30, "site": "B"},
+    {"id": "mid", "name": "Mid", "x": 0.50, "y": 0.52},
+    {"id": "mid_window", "name": "Mid Window", "x": 0.44, "y": 0.45},
+    {"id": "mid_courtyard", "name": "Mid Courtyard", "x": 0.50, "y": 0.64},
+    {"id": "mid_doors", "name": "Mid Doors", "x": 0.56, "y": 0.45},
+    {"id": "c_site", "name": "C Site", "x": 0.18, "y": 0.30, "site": "C"},
+    {"id": "c_long", "name": "C Long", "x": 0.16, "y": 0.55},
+    {"id": "c_lobby", "name": "C Lobby", "x": 0.22, "y": 0.80},
+    {"id": "c_link", "name": "C Link", "x": 0.30, "y": 0.45},
+    {"id": "attacker_spawn", "name": "Attacker Spawn", "x": 0.50, "y": 0.92},
+    {"id": "defender_spawn", "name": "Defender Spawn", "x": 0.50, "y": 0.10}
+  ],
+  "edges": [
+    ["attacker_spawn", "a_lobby"], ["attacker_spawn", "c_lobby"], ["attacker_spawn", "mid_courtyard"],
+    ["a_lobby", "a_long"], ["a_lobby", "a_short"], ["a_long", "a_site"], ["a_short", "a_site"],
+    ["a_short", "garage"], ["garage", "mid"], ["garage", "b_site"],
+    ["c_lobby", "c_long"], ["c_lobby", "c_link"], ["c_long", "c_site"], ["c_link", "c_site"],
+    ["c_link", "mid_window"],
+    ["mid_courtyard", "mid"], ["mid", "mid_window"], ["mid", "mid_doors"],
+    ["mid_window", "b_site"], ["mid_doors", "b_site"], ["mid_doors", "a_short"],
+    ["b_site", "defender_spawn"], ["defender_spawn", "a_site"], ["defender_spawn", "c_site"]
+  ]
+}
