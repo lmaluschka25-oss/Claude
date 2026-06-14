@@ -281,14 +281,20 @@ class MultiStageMinimapDetector(BaseDetector):
             return self._template_search(roi)
         return self._score_all(roi)  # cold-start fallback (teach a few icons!)
 
+    def _effective_threshold(self) -> float:
+        # Without taught templates, demand a very high bar so the map isn't
+        # spammed with false positives — teaching unlocks normal sensitivity.
+        return self.threshold if self._enemy_tmpl else max(self.threshold, 0.82)
+
     # ---- public API ------------------------------------------------------
     def find_enemies(self, frame):
         rx, ry, _, _, roi = self._roi(frame)
         if roi.size == 0:
             return []
+        thr = self._effective_threshold()
         out = []
         for cand in self._detect_candidates(roi):
-            if cand["total"] < self.threshold:
+            if cand["total"] < thr:
                 continue
             cx, cy = rx + cand["cx"], ry + cand["cy"]
             out.append(RawDetection("mm_enemy", round(cand["total"], 3),
@@ -303,14 +309,16 @@ class MultiStageMinimapDetector(BaseDetector):
         rx, ry, _, _, roi = self._roi(frame)
         if roi.size == 0:
             return rx, ry, []
+        thr = self._effective_threshold()
         items = []
         for cand in self._detect_candidates(roi):
-            if cand["total"] < 0.30:  # hide low-signal noise from the overlay
-                continue
+            confirmed = cand["total"] >= thr
+            if not confirmed and cand["total"] < 0.55:
+                continue  # hide low-signal noise from the overlay
             items.append({
                 "cx": rx + cand["cx"], "cy": ry + cand["cy"],
                 "w": cand["w"], "h": cand["h"],
-                "total": cand["total"], "confirmed": cand["total"] >= self.threshold,
+                "total": cand["total"], "confirmed": confirmed,
                 "scores": cand["scores"], "reasons": cand["reasons"],
                 "has_templates": bool(self._enemy_tmpl),
             })

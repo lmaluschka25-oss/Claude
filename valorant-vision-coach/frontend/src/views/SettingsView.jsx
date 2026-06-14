@@ -143,8 +143,9 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
               </label>
             </div>
             <div className="muted small" style={{ marginTop: 4 }}>
-              Green = confirmed enemy, red = rejected. Numbers = confidence %.
-              Click directly on an enemy ping to teach it.
+              Green ring = confirmed enemy (number = confidence %). Until you teach
+              a few templates, almost nothing is confirmed (on purpose — no spam).
+              Click directly on real enemy pings with “✓ Enemy” to teach them.
             </div>
             {round && (
               <div className="teach-row">

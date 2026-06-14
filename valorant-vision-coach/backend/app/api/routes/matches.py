@@ -217,16 +217,14 @@ def minimap_preview(
     if not clean:
         _rx, _ry, cands = detector.debug_candidates(frame)
         cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
-        confirmed = 0
-        for c in cands:
-            col = (0, 200, 0) if c["confirmed"] else (60, 60, 255)
-            confirmed += 1 if c["confirmed"] else 0
-            cv2.circle(frame, (int(c["cx"]), int(c["cy"])), 8, col, 2)
+        confirmed = [c for c in cands if c["confirmed"]]
+        for c in confirmed:
+            cv2.circle(frame, (int(c["cx"]), int(c["cy"])), 8, (0, 220, 0), 2)
             cv2.putText(frame, str(int(c["total"] * 100)),
                         (int(c["cx"]) + 8, int(c["cy"]) - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, col, 1)
-        cv2.putText(frame, f"enemies: {confirmed} (green=confirmed, red=rejected)",
-                    (rx, max(ry - 8, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 220, 0), 1)
+        cv2.putText(frame, f"enemies: {len(confirmed)}", (rx, max(ry - 8, 14)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
 
     if crop and rw > 0 and rh > 0:
         sub = frame[ry : ry + rh, rx : rx + rw]
