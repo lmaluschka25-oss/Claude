@@ -211,13 +211,83 @@ class MultiStageMinimapDetector(BaseDetector):
         self._history.append([(c["cx"], c["cy"]) for c in cands])
         return scored
 
+    # ---- template-matching-first detection ------------------------------
+    @staticmethod
+    def _nms(peaks, radius):
+        peaks = sorted(peaks, key=lambda p: p[2], reverse=True)
+        kept = []
+        for cx, cy, score in peaks:
+            if all(math.hypot(cx - kx, cy - ky) > radius for kx, ky, _ in kept):
+                kept.append((cx, cy, score))
+        return kept
+
+    def _best_false(self, patch):
+        import cv2
+
+        if not self._false_tmpl:
+            return 0.0
+        b = 0.0
+        for t in self._false_tmpl:
+            b = max(b, float(cv2.matchTemplate(patch, t, cv2.TM_CCOEFF_NORMED).max()))
+        return b
+
+    def _template_search(self, roi):
+        """Find enemy icons by matchTemplate over the whole minimap (robust to
+        colour/background). Used once the user has taught a few templates."""
+        import cv2
+
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        h_roi, w_roi = gray.shape[:2]
+        peaks = []
+        for t in self._enemy_tmpl:
+            if t.shape[0] >= h_roi or t.shape[1] >= w_roi:
+                continue
+            res = cv2.matchTemplate(gray, t, cv2.TM_CCOEFF_NORMED)
+            ys, xs = np.where(res >= 0.55)
+            for y, x in zip(ys, xs, strict=False):
+                peaks.append((x + t.shape[1] / 2.0, y + t.shape[0] / 2.0, float(res[y, x])))
+        peaks = self._nms(peaks, TEMPLATE_SIZE * 0.7)
+
+        cands = []
+        for cx, cy, score in peaks:
+            x = int(max(0, cx - TEMPLATE_SIZE / 2))
+            y = int(max(0, cy - TEMPLATE_SIZE / 2))
+            w = min(TEMPLATE_SIZE, w_roi - x)
+            h = min(TEMPLATE_SIZE, h_roi - y)
+            cand = {"cx": cx, "cy": cy, "x": x, "y": y, "w": w, "h": h, "hsv": hsv, "gray": gray}
+            color = self._color_cue(cand)
+            if color is None or color[0] is None:
+                continue  # teammate-coloured icon → not an enemy
+            patch = cv2.resize(gray[y : y + h, x : x + w], (TEMPLATE_SIZE, TEMPLATE_SIZE))
+            penalty = 0.3 * max(0.0, min(1.0, (self._best_false(patch) - 0.3) / 0.6))
+            tmpl = W_TEMPLATE * max(0.0, min(1.0, (score - 0.3) / 0.6))
+            motion, seen = self._motion_cue(cand)
+            shape = W_SHAPE * 0.6  # matched a real icon shape
+            total = max(0.0, color[0] + shape + tmpl + motion - penalty)
+            cand["total"] = total
+            cand["scores"] = {"color": round(color[0], 3), "shape": round(shape, 3),
+                              "template": round(tmpl, 3), "motion": round(motion, 3),
+                              "penalty": round(penalty, 3), "total": round(total, 3),
+                              "frames_seen": seen}
+            cand["reasons"] = {"color": color[1], "template": f"match {score:.2f}"}
+            cands.append(cand)
+        self._history.append([(c["cx"], c["cy"]) for c in cands])
+        return cands
+
+    def _detect_candidates(self, roi):
+        # Template matching is the primary, robust method once templates exist.
+        if self._enemy_tmpl:
+            return self._template_search(roi)
+        return self._score_all(roi)  # cold-start fallback (teach a few icons!)
+
     # ---- public API ------------------------------------------------------
     def find_enemies(self, frame):
         rx, ry, _, _, roi = self._roi(frame)
         if roi.size == 0:
             return []
         out = []
-        for cand in self._score_all(roi):
+        for cand in self._detect_candidates(roi):
             if cand["total"] < self.threshold:
                 continue
             cx, cy = rx + cand["cx"], ry + cand["cy"]
@@ -229,17 +299,20 @@ class MultiStageMinimapDetector(BaseDetector):
         return self.find_enemies(frame)
 
     def debug_candidates(self, frame):
-        """All candidates with scores + confirmed flag (for the debug overlay)."""
+        """Candidates with scores + confirmed flag (for the debug overlay)."""
         rx, ry, _, _, roi = self._roi(frame)
         if roi.size == 0:
             return rx, ry, []
         items = []
-        for cand in self._score_all(roi):
+        for cand in self._detect_candidates(roi):
+            if cand["total"] < 0.30:  # hide low-signal noise from the overlay
+                continue
             items.append({
                 "cx": rx + cand["cx"], "cy": ry + cand["cy"],
                 "w": cand["w"], "h": cand["h"],
                 "total": cand["total"], "confirmed": cand["total"] >= self.threshold,
                 "scores": cand["scores"], "reasons": cand["reasons"],
+                "has_templates": bool(self._enemy_tmpl),
             })
         return rx, ry, items
 
