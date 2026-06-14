@@ -203,6 +203,10 @@ def _persist(
         rnd.frame_count = output.frame_count
         rnd.map_name = map_name
         rnd.map_confidence = 0.99 if map_name else 0.0
+        # Adopt the detected map for the match if it was created without one, so
+        # the dashboard map renders and site logic has a board to work with.
+        if map_name and rnd.match is not None and not rnd.match.map_name:
+            rnd.match.map_name = map_name
 
         side_str = metadata.get("side")
         if side_str:

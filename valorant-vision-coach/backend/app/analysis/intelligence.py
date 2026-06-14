@@ -159,7 +159,7 @@ def _confidence(rounds_analyzed: int) -> tuple[float, str]:
 def build_match_intelligence(
     session: Session, match: Match, settings: Settings, round_id: int | None = None
 ) -> MatchIntelligence:
-    game_map = load_map(match.map_name) if match.map_name else None
+    game_map = None
     sites = _default_sites(game_map)
 
     rounds: list[Round] = list(match.rounds)
@@ -170,8 +170,18 @@ def build_match_intelligence(
         if chosen is not None:
             current = chosen
 
+    # Resolve the map even when the match was created without one: fall back to
+    # whatever a round detected, so the map renders and site logic works.
+    effective_map = (
+        match.map_name
+        or (current.map_name if current is not None else None)
+        or next((r.map_name for r in completed if r.map_name), None)
+    )
+    game_map = load_map(effective_map) if effective_map else None
+    sites = _default_sites(game_map)
+
     summary = MatchSummary(
-        id=match.id, name=match.name, map_name=match.map_name, side=match.side,
+        id=match.id, name=match.name, map_name=effective_map, side=match.side,
         created_at=match.created_at, updated_at=match.updated_at,
         rounds_count=len(rounds), completed_rounds=len(completed),
     )

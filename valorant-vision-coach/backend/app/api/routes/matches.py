@@ -42,7 +42,7 @@ _VIDEO_MIME = {
 # the cached frame, so the Settings preview stays snappy instead of re-decoding
 # the video on every slider tick.
 _FRAME_CACHE: OrderedDict[tuple, object] = OrderedDict()
-_FRAME_CACHE_MAX = 8
+_FRAME_CACHE_MAX = 12
 
 
 def _read_frame_at(path: str, t: float):

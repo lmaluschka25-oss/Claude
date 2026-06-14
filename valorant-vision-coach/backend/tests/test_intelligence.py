@@ -44,6 +44,21 @@ def _add_round(session, match, n, xy, committed):
         ))
 
 
+def test_intelligence_resolves_map_from_round_when_match_has_none():
+    """A match created without a map still gets a board: the map a round detected
+    is surfaced (so the dashboard renders) and drives site logic."""
+    with session_scope() as session:
+        match = Match(name="NoMap", map_name=None, side=Side.ATTACK)
+        session.add(match)
+        session.flush()
+        _add_round(session, match, 1, (0.80, 0.24), "B")  # round carries map_name="ascent"
+        session.flush()
+
+        intel = build_match_intelligence(session, match, SETTINGS)
+        assert intel.match.map_name == "ascent"  # resolved from the round
+        assert intel.recommendation.best_site is not None  # site logic had a board
+
+
 def test_build_intelligence_learns_and_recommends_weak_site():
     with session_scope() as session:
         match = Match(name="T", map_name="ascent", side=Side.ATTACK)

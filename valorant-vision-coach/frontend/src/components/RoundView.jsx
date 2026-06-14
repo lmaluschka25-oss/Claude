@@ -18,6 +18,17 @@ export default function RoundView({ round }) {
     return () => clearTimeout(id);
   }, [t]);
 
+  // When a completed round opens in "What it sees", start scanning from the top
+  // automatically so the timeline visibly plays through the round.
+  useEffect(() => {
+    if (ready && mode === "detect") {
+      setT(0);
+      setPlaying(true);
+    } else {
+      setPlaying(false);
+    }
+  }, [round?.id, ready, mode]);
+
   // Auto-play scans the whole recording front-to-back.
   useEffect(() => {
     if (!playing || mode !== "detect" || !ready) return;

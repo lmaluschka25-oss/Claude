@@ -44,7 +44,14 @@ export default function App() {
       setDetail(d);
       setIntel(intelligence);
       setRoundId(rid ?? intelligence.current_round?.id ?? null);
-      if (d.map_name) api.getMap(d.map_name).then(setMapMeta).catch(() => setMapMeta(null));
+      // Prefer the map the analysis resolved (a round may detect the map even
+      // when the match was created without one) so the board always renders.
+      const mapName =
+        intelligence.match?.map_name ||
+        intelligence.current_round?.map_name ||
+        intelligence.detected_info?.map_name ||
+        d.map_name;
+      if (mapName) api.getMap(mapName).then(setMapMeta).catch(() => setMapMeta(null));
       else setMapMeta(null);
     } catch (e) {
       setError(e.message);
