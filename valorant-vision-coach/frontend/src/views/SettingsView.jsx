@@ -20,6 +20,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
   const [busy, setBusy] = useState(false);
   const [mask, setMask] = useState(true);
   const [t, setT] = useState(2);
+  const [zoom, setZoom] = useState(true);
   const [teachLabel, setTeachLabel] = useState("enemy");
   const [pkey, setPkey] = useState(0);
   const [taught, setTaught] = useState(null);
@@ -55,7 +56,9 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
 
   const stats = intelligence?.detection_stats;
   const round = calibrationRound;
-  const previewSrc = round ? `${api.minimapPreviewUrl(round.id, { t, mask, ...s })}&_=${pkey}` : null;
+  const previewSrc = round
+    ? `${api.minimapPreviewUrl(round.id, { t, mask, crop: zoom, ...s })}&_=${pkey}`
+    : null;
 
   async function onTeach(e) {
     if (!round) return;
@@ -63,7 +66,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
     const x = ((e.clientX - r.left) / r.width).toFixed(4);
     const y = ((e.clientY - r.top) / r.height).toFixed(4);
     try {
-      await api.teachRound(round.id, { t, x, y, label: teachLabel });
+      await api.teachRound(round.id, { t, x, y, label: teachLabel, roi: zoom });
       setTaught(teachLabel);
       setPkey((k) => k + 1);
     } catch {
@@ -110,7 +113,7 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
           <label className="slider">
             <span>Analysis interval <em>{s.analysis_interval}s</em></span>
             <select value={s.analysis_interval} onChange={(e) => set("analysis_interval", Number(e.target.value))}>
-              {[0.25, 0.5, 1, 2].map((v) => <option key={v} value={v}>{v}s ({Math.round(1 / v)} fps)</option>)}
+              {[0.25, 0.33, 0.5, 1, 2].map((v) => <option key={v} value={v}>{v}s (~{Math.round(1 / v)} fps)</option>)}
             </select>
           </label>
           <Slider s={s} set={set} k="confidence_threshold" label="Confidence threshold" min={0} max={1} step={0.05} fmt={pct} />
@@ -133,8 +136,15 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
             ) : (
               <div className="empty small">Analyze a round to preview detection here.</div>
             )}
-            <div className="muted small" style={{ marginTop: 6 }}>
+            <div className="teach-row" style={{ marginTop: 6 }}>
+              <label className="check-row">
+                <input type="checkbox" checked={zoom} onChange={(e) => setZoom(e.target.checked)} />
+                Zoom to minimap (for precise teaching)
+              </label>
+            </div>
+            <div className="muted small" style={{ marginTop: 4 }}>
               Green = confirmed enemy, red = rejected. Numbers = confidence %.
+              Click directly on an enemy ping to teach it.
             </div>
             {round && (
               <div className="teach-row">

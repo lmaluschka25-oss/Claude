@@ -229,13 +229,12 @@ def minimap_preview(
                     (rx, max(ry - 8, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
 
     if crop and rw > 0 and rh > 0:
-        pad = 6
-        y0, y1 = max(ry - pad, 0), min(ry + rh + pad, fh)
-        x0, x1 = max(rx - pad, 0), min(rx + rw + pad, fw)
-        sub = frame[y0:y1, x0:x1]
+        sub = frame[ry : ry + rh, rx : rx + rw]
         if sub.size and sub.shape[1] > 0:
-            scale = 360.0 / sub.shape[1]
-            frame = cv2.resize(sub, (360, max(1, int(sub.shape[0] * scale))))
+            target = 560  # crisp zoom of just the minimap for precise teaching
+            scale = target / sub.shape[1]
+            frame = cv2.resize(sub, (target, max(1, int(sub.shape[0] * scale))),
+                               interpolation=cv2.INTER_NEAREST)
 
     ok, buf = cv2.imencode(".png", frame)
     if not ok:
@@ -265,12 +264,15 @@ def teach_round(
     x: float = 0.5,
     y: float = 0.5,
     label: str = "enemy",
+    roi: bool = False,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings_dep),
 ) -> dict:
-    """Save a template at normalized point (x,y) as a confirmed enemy / false +.
+    """Save a template at (x,y) as a confirmed enemy / false positive.
 
-    Feeds the learnable template store used by the multi-stage detector.
+    ``roi=1`` ⇒ (x,y) are normalized within the minimap box (matches the zoomed
+    teach view); otherwise they are normalized over the whole frame. Feeds the
+    learnable template store used by the multi-stage detector.
     """
     rnd = _require_round(session, round_id)
     import cv2
@@ -287,9 +289,15 @@ def teach_round(
     if not ok or frame is None:
         raise HTTPException(status_code=404, detail="Frame not readable here.")
     fh, fw = frame.shape[:2]
-    det = MultiStageMinimapDetector(settings, calibration=calibration_store.calibration(settings))
-    saved = det.teach(frame, x * fw, y * fh, "false" if label == "false" else "enemy")
-    return {"saved": bool(saved), "label": label}
+    calib = calibration_store.calibration(settings)
+    if roi:
+        rx, ry, rw, rh = calib.roi_pixels(fw, fh)
+        px, py = rx + x * rw, ry + y * rh
+    else:
+        px, py = x * fw, y * fh
+    det = MultiStageMinimapDetector(settings, calibration=calib)
+    saved = det.teach(frame, px, py, "false" if label == "false" else "enemy")
+    return {"saved": bool(saved), "label": label, "px": round(px, 1), "py": round(py, 1)}
 
 
 @rounds_router.get("/{round_id}/video")

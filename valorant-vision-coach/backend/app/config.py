@@ -87,7 +87,7 @@ class Settings(BaseSettings):
 
     # ---- Advanced detection / analysis settings (user-tunable, persisted) ---
     # Each maps to a real parameter and measurably changes analysis output.
-    analysis_interval: float = 0.5  # seconds between analyzed frames
+    analysis_interval: float = 0.33  # seconds between analyzed frames (~3 fps)
     confidence_threshold: float = 0.0  # drop enemy detections below this
     pattern_weight: float = 0.34  # momentum weight in next-round prediction
     memory_weight: float = 0.34  # base-rate (whole-match) weight in prediction
