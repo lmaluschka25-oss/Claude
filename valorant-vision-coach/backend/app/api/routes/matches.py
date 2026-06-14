@@ -248,16 +248,25 @@ def minimap_preview(
     fh, fw = frame.shape[:2]
     rx, ry, rw, rh = calib.roi_pixels(fw, fh)
     if not clean:
-        _rx, _ry, cands = detector.debug_candidates(frame)
+        _rx, _ry, cands = detector.debug_candidates(frame, min_total=0.3)
         cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (0, 255, 0), 2)
         confirmed = [c for c in cands if c["confirmed"]]
+        # Amber = considered but not confirmed yet. These are exactly what to
+        # click-to-teach so the detector learns to confirm them.
+        candidates = sorted((c for c in cands if not c["confirmed"]),
+                            key=lambda c: c["total"], reverse=True)[:25]
+        for c in candidates:
+            cv2.circle(frame, (int(c["cx"]), int(c["cy"])), 7, (0, 170, 255), 1)
+            cv2.putText(frame, str(int(c["total"] * 100)),
+                        (int(c["cx"]) + 7, int(c["cy"]) - 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 170, 255), 1)
         for c in confirmed:
             cv2.circle(frame, (int(c["cx"]), int(c["cy"])), 8, (0, 220, 0), 2)
             cv2.putText(frame, str(int(c["total"] * 100)),
                         (int(c["cx"]) + 8, int(c["cy"]) - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 220, 0), 1)
-        cv2.putText(frame, f"enemies: {len(confirmed)}", (rx, max(ry - 8, 14)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+        cv2.putText(frame, f"confirmed: {len(confirmed)}   candidates: {len(candidates)}",
+                    (rx, max(ry - 8, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     if crop and rw > 0 and rh > 0:
         sub = frame[ry : ry + rh, rx : rx + rw]

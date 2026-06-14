@@ -361,16 +361,23 @@ class MultiStageMinimapDetector(BaseDetector):
     def detect(self, frame, frame_index, timestamp):
         return self.find_enemies(frame)
 
-    def debug_candidates(self, frame):
-        """Candidates with scores + confirmed flag (for the debug overlay)."""
+    def debug_candidates(self, frame, min_total: float = 0.3):
+        """Candidates with scores + confirmed flag (for the teaching preview).
+
+        Uses the *raw* confirm threshold (what the slider shows) so the preview
+        reflects the user's setting directly. The analysis pipeline keeps the
+        stricter cold-start floor via ``find_enemies``. ``min_total`` is the
+        floor below which a candidate is hidden as noise — lower than the
+        confirm threshold so you can see (and click-to-teach) near-misses.
+        """
         rx, ry, _, _, roi = self._roi(frame)
         if roi.size == 0:
             return rx, ry, []
-        thr = self._effective_threshold()
+        thr = self.threshold
         items = []
         for cand in self._detect_candidates(roi):
             confirmed = cand["total"] >= thr
-            if not confirmed and cand["total"] < 0.55:
+            if not confirmed and cand["total"] < min_total:
                 continue  # hide low-signal noise from the overlay
             items.append({
                 "cx": rx + cand["cx"], "cy": ry + cand["cy"],

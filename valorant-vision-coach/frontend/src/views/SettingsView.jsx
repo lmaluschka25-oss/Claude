@@ -201,10 +201,12 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
               </label>
             </div>
             <div className="muted small" style={{ marginTop: 4 }}>
-              Green ring = confirmed enemy (number = confidence %). Pick <b>✓ Enemy</b> and click
-              directly on a real enemy ping to teach it; pick <b>✕ False</b> and click a wrong
-              spot to teach the detector to ignore it. Each click trains it — what it has learned
-              shows in <b>LEARNED TEMPLATES</b> below.
+              <b style={{ color: "#19c37d" }}>Green ring</b> = confirmed enemy ·
+              <b style={{ color: "#ffaa2a" }}> amber ring</b> = considered but not confirmed yet
+              (number = confidence %). Until you teach a few icons, expect mostly amber — those
+              are exactly what to click. Pick <b>✓ Enemy</b> and click a real enemy ping to teach
+              it; pick <b>✕ False</b> and click a wrong spot to teach it to ignore that. Each click
+              trains it — see <b>LEARNED TEMPLATES</b> below.
             </div>
             {round && (
               <div className="teach-row">
