@@ -94,24 +94,32 @@ def test_taught_icon_confirms_in_single_frame_without_motion():
         shutil.rmtree(tdir, ignore_errors=True)
 
 
-def test_training_overrides_teammate_colour():
-    """Cold-start excludes teammate-green; but once the user explicitly teaches a
-    green-ish icon as an enemy, a strong template match confirms it anyway."""
+def test_colour_separates_enemy_from_same_shape_teammate():
+    """The whole point of colour templates: an enemy and a teammate that look
+    identical in shape and differ only in colour must NOT be confused. Teaching
+    the red enemy confirms it while leaving the green look-alike unconfirmed."""
     import shutil
 
     from app.vision.multistage import templates_dir
 
     tdir = templates_dir(SETTINGS)
     try:
-        cx, cy = _roi_center()
-        green = np.zeros((720, 1280, 3), dtype=np.uint8)
-        cv2.rectangle(green, (cx - 4, cy - 1), (cx + 4, cy + 1), (0, 200, 0), -1)
-        cv2.rectangle(green, (cx - 1, cy - 4), (cx + 1, cy + 4), (0, 200, 0), -1)
-        assert MultiStageMinimapDetector(SETTINGS).teach(green, cx, cy, "enemy")
+        rx, ry, rw, rh = SETTINGS.minimap_calibration().roi_pixels(1280, 720)
+        ex, ey = rx + rw // 3, ry + rh // 2        # enemy (red)
+        tx, ty = rx + 2 * rw // 3, ry + rh // 2    # teammate (green), same shape
+
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        for px, py, col in ((ex, ey, (0, 0, 255)), (tx, ty, (0, 200, 0))):
+            cv2.rectangle(frame, (px - 4, py - 1), (px + 4, py + 1), col, -1)
+            cv2.rectangle(frame, (px - 1, py - 4), (px + 1, py + 4), col, -1)
+
+        assert MultiStageMinimapDetector(SETTINGS).teach(frame, ex, ey, "enemy")  # only the red one
 
         det = MultiStageMinimapDetector(SETTINGS)
-        dets = det.find_enemies(green)
-        assert any(abs(d.center[0] - cx) < 16 and abs(d.center[1] - cy) < 16 for d in dets)
+        dets = det.find_enemies(frame)
+        hit_enemy = any(abs(d.center[0] - ex) < 16 and abs(d.center[1] - ey) < 16 for d in dets)
+        hit_team = any(abs(d.center[0] - tx) < 16 and abs(d.center[1] - ty) < 16 for d in dets)
+        assert hit_enemy and not hit_team
     finally:
         shutil.rmtree(tdir, ignore_errors=True)
 

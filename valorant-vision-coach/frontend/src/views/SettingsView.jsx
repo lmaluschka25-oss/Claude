@@ -14,6 +14,29 @@ function Slider({ s, set, k, label, min, max, step, fmt }) {
   );
 }
 
+// Coarse name for an OpenCV hue (0–179) so the user can read the learned colour.
+function hueName(h) {
+  const c = h * 2; // OpenCV hue → CSS degrees
+  if (c < 15 || c >= 345) return "red";
+  if (c < 45) return "orange";
+  if (c < 70) return "yellow";
+  if (c < 170) return "green";
+  if (c < 200) return "cyan";
+  if (c < 260) return "blue";
+  if (c < 310) return "purple";
+  return "pink";
+}
+
+function HueChip({ hue, label }) {
+  if (hue == null) return null;
+  return (
+    <span className="hue-chip" title={`Learned ${label} colour`}>
+      <i style={{ background: `hsl(${hue * 2} 80% 50%)` }} />
+      {label}: {hueName(hue)}
+    </span>
+  );
+}
+
 // Gallery of taught patches for one label. Module-level so it doesn't remount
 // (and refetch thumbnails) on every settings change. The newest `cap` are the
 // ones actually matched per frame; older ones are dimmed as "unused".
@@ -264,14 +287,17 @@ export default function SettingsView({ info, intelligence, calibrationRound, onR
       <div className="panel">
         <div className="panel-head">
           <h3>LEARNED TEMPLATES</h3>
-          <span className="muted small">{templates.enemy_count} enemy · {templates.false_count} false</span>
+          <span className="hue-chips">
+            <HueChip hue={templates.enemy_hue} label="enemy" />
+            <HueChip hue={templates.false_hue} label="false" />
+          </span>
         </div>
         <div className="panel-body">
           <div className="muted small" style={{ marginBottom: 8 }}>
-            These are the patches the detector learned from your clicks. Enemy patches are matched
-            against the minimap to find enemies; false patches suppress look-alikes. The newest
-            <b> {cap}</b> of each are used per frame (the cap below — fewer = faster). Click ✕ to
-            forget a mistake. Dimmed = beyond the cap, currently unused.
+            These are the patches the detector learned from your clicks — now in <b>colour</b>, so
+            it tells an enemy from a same-shaped teammate by the marker colour, not just the shape.
+            The newest <b>{cap}</b> of each are matched per frame (the cap below — fewer = faster).
+            Click ✕ to forget a mistake. Dimmed = beyond the cap, currently unused.
           </div>
           <div className="sub-label">Enemy ({templates.enemy_count})</div>
           <Gallery label="enemy" names={templates.enemy} cap={cap} onDelete={delTemplate} />

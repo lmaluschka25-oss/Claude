@@ -61,12 +61,15 @@ def reset_calibration(settings: Settings = Depends(get_settings_dep)) -> dict:
 def get_templates(settings: Settings = Depends(get_settings_dep)) -> dict:
     """List every patch the user has taught, split into enemy / false."""
     t = multistage.list_templates(settings)
+    colors = multistage.learned_colors(settings)
     return {
         "enemy": t["enemy"],
         "false": t["false"],
         "enemy_count": len(t["enemy"]),
         "false_count": len(t["false"]),
         "active_cap": settings.detection_max_templates,
+        "enemy_hue": colors["enemy_hue"],
+        "false_hue": colors["false_hue"],
     }
 
 
@@ -80,7 +83,7 @@ def get_template_image(
     path = multistage.template_path(settings, label, name)
     if path is None:
         raise HTTPException(status_code=404, detail="Template not found.")
-    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread(str(path), cv2.IMREAD_COLOR)  # colour so the memory shows its real hue
     if img is None:
         raise HTTPException(status_code=404, detail="Template unreadable.")
     big = cv2.resize(img, (64, 64), interpolation=cv2.INTER_NEAREST)

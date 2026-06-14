@@ -32,6 +32,10 @@ logger = get_logger(__name__)
 # Confidence caps per cue (the spec's weights).
 W_COLOR, W_SHAPE, W_TEMPLATE, W_MOTION = 0.20, 0.25, 0.35, 0.20
 TEMPLATE_SIZE = 24  # normalized patch size for template matching
+# Max circular hue gap (OpenCV 0–179) to still count as the *same* colour. Wide
+# enough to absorb lighting variance, tight enough to keep red enemies apart
+# from green teammates.
+HUE_MATCH_TOL = 20
 
 
 def templates_dir(settings: Settings) -> Path:
@@ -73,6 +77,27 @@ def delete_template(settings: Settings, label: str, name: str) -> bool:
         return False
 
 
+def learned_colors(settings: Settings) -> dict:
+    """The median learned hue (OpenCV 0–179) per class, or None — so the UI can
+    show *which colour* the detector now treats as the enemy."""
+    import cv2
+
+    base = templates_dir(settings)
+
+    def median_hue(sub: str):
+        d = base / sub
+        hues = []
+        if d.exists():
+            for p in sorted(d.glob("*.png")):
+                img = cv2.imread(str(p), cv2.IMREAD_COLOR)
+                hv = _dominant_hue(img, 60, 60) if img is not None else None
+                if hv is not None:
+                    hues.append(hv)
+        return int(np.median(hues)) if hues else None
+
+    return {"enemy_hue": median_hue("enemy"), "false_hue": median_hue("false")}
+
+
 def clear_templates(settings: Settings) -> int:
     """Forget everything the user taught. Returns how many patches were removed."""
     base = templates_dir(settings)
@@ -107,6 +132,26 @@ def _is_teammate_hue(h: int) -> bool:
     return 42 <= h <= 100
 
 
+def _hue_distance(a: int, b: int) -> int:
+    """Circular distance between two OpenCV hues (0–179)."""
+    d = abs(int(a) - int(b)) % 180
+    return min(d, 180 - d)
+
+
+def _dominant_hue(bgr, sat_floor: int, val_floor: int) -> int | None:
+    """Median hue of the vivid pixels in a BGR patch, or None if it's colourless
+    (e.g. an old grayscale template, or a washed-out patch)."""
+    import cv2
+
+    if bgr is None or bgr.size == 0:
+        return None
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    sel = (hsv[:, :, 1] >= sat_floor) & (hsv[:, :, 2] >= val_floor)
+    if not sel.any():
+        return None
+    return int(np.median(hsv[:, :, 0][sel]))
+
+
 class MultiStageMinimapDetector(BaseDetector):
     ready = True
 
@@ -132,6 +177,9 @@ class MultiStageMinimapDetector(BaseDetector):
 
     # ---- templates (learnable) ------------------------------------------
     def _load_templates(self):
+        """Load taught patches in COLOUR. Each template carries a grayscale image
+        (for shape localization via matchTemplate) and its learned dominant hue
+        (so enemies and same-shaped teammates are told apart by colour)."""
         import cv2
 
         def load(sub):
@@ -141,9 +189,12 @@ class MultiStageMinimapDetector(BaseDetector):
                 # Keep only the newest N (perf cap): the most recently taught
                 # patches are matched per frame, the dominant per-frame cost.
                 for p in sorted(d.glob("*.png"))[-self.max_templates:]:
-                    img = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
-                    if img is not None:
-                        out.append(cv2.resize(img, (TEMPLATE_SIZE, TEMPLATE_SIZE)))
+                    img = cv2.imread(str(p), cv2.IMREAD_COLOR)  # BGR (gray PNGs → 3 equal ch)
+                    if img is None:
+                        continue
+                    img = cv2.resize(img, (TEMPLATE_SIZE, TEMPLATE_SIZE))
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    out.append({"gray": gray, "hue": _dominant_hue(img, self.sat_floor, self.val_floor)})
             return out
 
         return load("enemy"), load("false")
@@ -222,7 +273,7 @@ class MultiStageMinimapDetector(BaseDetector):
         def best(tmpls):
             b = 0.0
             for t in tmpls:
-                r = cv2.matchTemplate(patch, t, cv2.TM_CCOEFF_NORMED)
+                r = cv2.matchTemplate(patch, t["gray"], cv2.TM_CCOEFF_NORMED)
                 b = max(b, float(r.max()))
             return b
 
@@ -285,30 +336,36 @@ class MultiStageMinimapDetector(BaseDetector):
             return 0.0
         b = 0.0
         for t in self._false_tmpl:
-            b = max(b, float(cv2.matchTemplate(patch, t, cv2.TM_CCOEFF_NORMED).max()))
+            b = max(b, float(cv2.matchTemplate(patch, t["gray"], cv2.TM_CCOEFF_NORMED).max()))
         return b
 
     def _template_search(self, roi):
-        """Find enemy icons by matchTemplate over the whole minimap (robust to
-        colour/background). Used once the user has taught a few templates."""
+        """Find enemy icons by matchTemplate, then confirm by COLOUR learned from
+        your examples. Shape (grayscale) localizes the icon — robust to the
+        background — and the taught hue separates enemies from same-shaped
+        teammates whose only difference is colour. Used once you've taught icons.
+        """
         import cv2
 
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
         h_roi, w_roi = gray.shape[:2]
+        enemy_hues = [t["hue"] for t in self._enemy_tmpl if t["hue"] is not None]
+        false_hues = [t["hue"] for t in self._false_tmpl if t["hue"] is not None]
+
         peaks = []
         for t in self._enemy_tmpl:
-            if t.shape[0] >= h_roi or t.shape[1] >= w_roi:
+            tg = t["gray"]
+            if tg.shape[0] >= h_roi or tg.shape[1] >= w_roi:
                 continue
-            res = cv2.matchTemplate(gray, t, cv2.TM_CCOEFF_NORMED)
+            res = cv2.matchTemplate(gray, tg, cv2.TM_CCOEFF_NORMED)
             ys, xs = np.where(res >= self.template_threshold)
             for y, x in zip(ys, xs, strict=False):
-                peaks.append((x + t.shape[1] / 2.0, y + t.shape[0] / 2.0, float(res[y, x])))
+                peaks.append((x + tg.shape[1] / 2.0, y + tg.shape[0] / 2.0, float(res[y, x])))
         peaks = self._nms(peaks, TEMPLATE_SIZE * 0.7)
 
-        # A clearly strong match against a patch the *user taught* is, on its
-        # own, enough to confirm — that is the whole point of teaching. Motion
-        # is only a bonus here (the single-frame preview has no history).
+        # A strong shape match whose COLOUR also agrees with a taught enemy is, on
+        # its own, enough to confirm. Motion is only a bonus (the single-frame
+        # preview has no history).
         strong_bar = max(self.template_threshold + 0.08, 0.66)
         cands = []
         for cx, cy, score in peaks:
@@ -316,35 +373,40 @@ class MultiStageMinimapDetector(BaseDetector):
             y = int(max(0, cy - TEMPLATE_SIZE / 2))
             w = min(TEMPLATE_SIZE, w_roi - x)
             h = min(TEMPLATE_SIZE, h_roi - y)
-            cand = {"cx": cx, "cy": cy, "x": x, "y": y, "w": w, "h": h, "hsv": hsv, "gray": gray}
+            cand_hue = _dominant_hue(roi[y : y + h, x : x + w], self.sat_floor, self.val_floor)
 
-            col = self._color_cue(cand)
-            if col is None or col[0] is None:
-                # Reads teammate-coloured — but the user taught this as an enemy,
-                # so keep it (training overrides colour) with no colour credit and
-                # a mild caution penalty instead of dropping it outright.
-                color_score, color_reason, teammate = 0.0, "teammate-hue (overridden by training)", True
-            else:
-                color_score, color_reason, teammate = col[0], col[1], False
+            # ---- colour discrimination: enemy vs same-shaped teammate ----
+            color_ok = True
+            color_score = W_COLOR * 0.5  # neutral when no colour reference
+            color_reason = "no colour info"
+            if cand_hue is not None and enemy_hues:
+                enemy_d = min(_hue_distance(cand_hue, hv) for hv in enemy_hues)
+                false_d = min((_hue_distance(cand_hue, hv) for hv in false_hues), default=999)
+                if false_d < enemy_d:
+                    continue  # colour matches a taught FALSE (e.g. teammate) → reject
+                color_ok = enemy_d <= HUE_MATCH_TOL
+                color_score = W_COLOR * max(0.0, 1.0 - enemy_d / HUE_MATCH_TOL)
+                color_reason = f"hue {cand_hue} (Δ{enemy_d} from enemy)"
+            elif cand_hue is not None and _is_teammate_hue(cand_hue):
+                color_ok, color_score, color_reason = False, 0.0, f"teammate hue {cand_hue}"
 
+            cand = {"cx": cx, "cy": cy, "x": x, "y": y, "w": w, "h": h, "gray": gray}
             patch = cv2.resize(gray[y : y + h, x : x + w], (TEMPLATE_SIZE, TEMPLATE_SIZE))
             penalty = 0.3 * max(0.0, min(1.0, (self._best_false(patch) - 0.3) / 0.6))
-            if teammate:
-                penalty += 0.08
-            # Anchor template credit to the user's strictness slider: passing the
-            # bar already means "accepted" (0.6 of the weight); a perfect match
-            # gives the full weight.
+            # Anchor template credit to the strictness slider: passing the bar is
+            # already an accepted match (0.6 of weight); a perfect match → full.
             norm = (score - self.template_threshold) / max(1e-3, 1.0 - self.template_threshold)
             tmpl = W_TEMPLATE * (0.6 + 0.4 * max(0.0, min(1.0, norm)))
             motion, seen = self._motion_cue(cand)  # bonus only
             shape = W_SHAPE * 0.6  # matched a real icon shape
             total = max(0.0, color_score + shape + tmpl + motion - penalty)
+            # Confirm a strong shape match only when colour also agrees → surer.
             cand["total"] = total
-            cand["strong"] = bool(score >= strong_bar)
+            cand["strong"] = bool(score >= strong_bar and color_ok)
             cand["scores"] = {"color": round(color_score, 3), "shape": round(shape, 3),
                               "template": round(tmpl, 3), "motion": round(motion, 3),
                               "penalty": round(penalty, 3), "total": round(total, 3),
-                              "frames_seen": seen}
+                              "frames_seen": seen, "hue": cand_hue if cand_hue is not None else -1}
             cand["reasons"] = {"color": color_reason, "template": f"match {score:.2f}"}
             cands.append(cand)
         self._history.append([(c["cx"], c["cy"]) for c in cands])
@@ -407,16 +469,19 @@ class MultiStageMinimapDetector(BaseDetector):
         return rx, ry, items
 
     def teach(self, frame, px: float, py: float, label: str) -> bool:
-        """Save a 24×24 grayscale patch around (px,py) as an enemy/false template."""
+        """Save a 24×24 COLOUR patch around (px,py) as an enemy/false template.
+
+        Colour is kept (not grayscale) so the detector can later tell an enemy
+        from a same-shaped teammate by the marker colour you trained on.
+        """
         import cv2
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape[:2]
+        h, w = frame.shape[:2]
         half = TEMPLATE_SIZE // 2
         x0, y0 = int(px) - half, int(py) - half
         x0 = max(0, min(x0, w - TEMPLATE_SIZE))
         y0 = max(0, min(y0, h - TEMPLATE_SIZE))
-        patch = gray[y0 : y0 + TEMPLATE_SIZE, x0 : x0 + TEMPLATE_SIZE]
+        patch = frame[y0 : y0 + TEMPLATE_SIZE, x0 : x0 + TEMPLATE_SIZE]
         if patch.size == 0:
             return False
         sub = "false" if label == "false" else "enemy"
